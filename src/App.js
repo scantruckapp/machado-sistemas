@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 const USUARIOS = {
   felipe: { senha: "felipe123", nome: "Felipe", role: "admin" },
@@ -19,11 +19,90 @@ const STATUS_ENV = {
   entregue: { label: "Entregue", cor: "#10B981" },
 };
 
-const salvarDados = async (pedidos) => {
-  try { await window.storage.set("pedidos_ms", JSON.stringify(pedidos)); } catch { localStorage.setItem("pedidos_ms", JSON.stringify(pedidos)); }
+// ── SUPABASE CONFIG ───────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://vxkqmrsdpjtoduezqocl.supabase.co";
+const SUPABASE_KEY = "sb_publishable_uzdzgDvbjy5oOuEfpqd32Q_ZRrLnhGPMTgKRc4";
+
+const sbFetch = async (path, opts={}) => {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+    ...opts,
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation",
+      ...(opts.headers||{}),
+    },
+  });
+  if(!r.ok) { const e = await r.text(); throw new Error(e); }
+  const txt = await r.text();
+  return txt ? JSON.parse(txt) : [];
 };
+
 const carregarDados = async () => {
-  try { const r = await window.storage.get("pedidos_ms"); return r ? JSON.parse(r.value) : []; } catch { const b = localStorage.getItem("pedidos_ms"); return b ? JSON.parse(b) : []; }
+  try {
+    const rows = await sbFetch("/pedidos?order=criado_em.desc");
+    return rows.map(r => ({
+      id: r.id,
+      cliente: r.cliente,
+      telefone: r.telefone,
+      dataPedido: r.data_pedido,
+      dataEnvio: r.data_envio,
+      kits: r.kits || [],
+      desconto: r.desconto,
+      subtotal: r.subtotal,
+      descVal: r.desc_val,
+      totalFinal: r.total_final,
+      obs: r.obs,
+      vendedor: r.vendedor,
+      entradas: r.entradas || [],
+      statusEnvio: r.status_envio,
+      rastreio: r.rastreio,
+      frete: r.frete,
+      criadoEm: r.criado_em,
+    }));
+  } catch(e) {
+    console.error("Erro ao carregar:", e);
+    const b = localStorage.getItem("pedidos_ms");
+    return b ? JSON.parse(b) : [];
+  }
+};
+
+const salvarPedido = async (p) => {
+  const row = {
+    id: p.id,
+    cliente: p.cliente,
+    telefone: p.telefone,
+    data_pedido: p.dataPedido,
+    data_envio: p.dataEnvio,
+    kits: p.kits,
+    desconto: p.desconto,
+    subtotal: p.subtotal,
+    desc_val: p.descVal,
+    total_final: p.totalFinal,
+    obs: p.obs,
+    vendedor: p.vendedor,
+    entradas: p.entradas,
+    status_envio: p.statusEnvio,
+    rastreio: p.rastreio,
+    frete: p.frete,
+    criado_em: p.criadoEm,
+  };
+  await sbFetch("/pedidos", {
+    method: "POST",
+    headers: { "Prefer": "resolution=merge-duplicates" },
+    body: JSON.stringify(row),
+  });
+};
+
+const salvarDados = async (pedidos) => {
+  try {
+    await Promise.all(pedidos.map(p => salvarPedido(p)));
+    localStorage.setItem("pedidos_ms", JSON.stringify(pedidos));
+  } catch(e) {
+    console.error("Erro ao salvar:", e);
+    localStorage.setItem("pedidos_ms", JSON.stringify(pedidos));
+  }
 };
 
 const fmt = (v) => `R$ ${Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2})}`;
