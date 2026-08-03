@@ -230,6 +230,41 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
   const [kits, setKits] = useState(ed.kits||[{tam:4,qtd:1,volt:"220v"}]);
   const [desc, setDesc] = useState(ed.desconto||0);
   const [obs, setObs] = useState(ed.obs||"");
+  const [entradaValor, setEntradaValor] = useState("");
+  const [comprovante, setComprovante] = useState(null);
+  const [analisando, setAnalisando] = useState(false);
+
+  const toBase64 = (file) => new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(",")[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+  const analisarComprovante = async (file) => {
+    if(!file) return;
+    setAnalisando(true);
+    try {
+      const b64 = await toBase64(file);
+      const resp = await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model:"claude-sonnet-4-6",
+          max_tokens:200,
+          messages:[{role:"user",content:[
+            {type:"image",source:{type:"base64",media_type:file.type,data:b64}},
+            {type:"text",text:"Analise este comprovante de pagamento. Extraia APENAS o valor em reais. Responda SOMENTE com JSON: {\"valor\": 1250.00}"}
+          ]}]
+        })
+      });
+      const data = await resp.json();
+      const txt = data.content?.[0]?.text||"{}";
+      const parsed = JSON.parse(txt.replace(/```json|```/g,"").trim());
+      if(parsed.valor) setEntradaValor(String(parsed.valor));
+    } catch(e) { alert("Não consegui ler o valor. Digite manualmente."); }
+    setAnalisando(false);
+  };
 
   const addKit = () => setKits([...kits,{tam:4,qtd:1,volt:"220v"}]);
   const remKit = (i) => setKits(kits.filter((_,x)=>x!==i));
@@ -247,7 +282,9 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
       dataPedido, dataEnvio, kits, desconto: Number(desc),
       subtotal: sub, descVal: dv, totalFinal: total, obs,
       vendedor: ed.vendedor||usuario.nome,
-      entradas: ed.entradas||[],
+      entradas: entradaValor && parseFloat(entradaValor) > 0
+        ? [...(ed.entradas||[]), {id:uid(), valor:parseFloat(entradaValor), data:hoje(), tipo:"Entrada"}]
+        : (ed.entradas||[]),
       statusEnvio: ed.statusEnvio||"aguardando",
       rastreio: ed.rastreio||"", frete: ed.frete||0,
       criadoEm: ed.criadoEm||new Date().toISOString(),
@@ -316,6 +353,29 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
           <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Observações</div>
           <textarea value={obs} onChange={e=>setObs(e.target.value)} placeholder="PAC, arcos quadrados, instruções especiais..."
             style={{width:"100%",background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,minHeight:90,boxSizing:"border-box",outline:"none",resize:"vertical"}}/>
+        </Card>
+
+        <Card>
+          <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>💰 Entrada (pagamento inicial)</div>
+          <label style={{display:"block",background:"#00C89611",border:"2px dashed "+S.verde,borderRadius:10,padding:14,textAlign:"center",cursor:"pointer",marginBottom:10}}>
+            <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+              const f=e.target.files[0];
+              if(f){setComprovante(f);analisarComprovante(f);}
+            }}/>
+            {analisando?(
+              <div style={{color:S.verde,fontSize:13}}>⏳ Lendo comprovante...</div>
+            ):comprovante?(
+              <div style={{color:S.verde,fontSize:13}}>✅ {comprovante.name}<br/><span style={{color:S.dim,fontSize:11}}>Toque para trocar</span></div>
+            ):(
+              <div style={{color:S.verde,fontSize:13}}>📷 Subir comprovante de entrada<br/><span style={{color:S.dim,fontSize:11}}>A IA lê o valor automaticamente</span></div>
+            )}
+          </label>
+          <Campo label="Valor da entrada (R$)" value={entradaValor} onChange={setEntradaValor} type="number" placeholder="0,00"/>
+          {entradaValor && parseFloat(entradaValor) > 0 && (
+            <div style={{background:S.card2,borderRadius:10,padding:12,fontSize:13,color:S.dim}}>
+              Saldo restante após entrada: <b style={{color:"#F59E0B"}}>{fmt((calcKit(kits,desc).total) - parseFloat(entradaValor))}</b>
+            </div>
+          )}
         </Card>
       </div>
 
