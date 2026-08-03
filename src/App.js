@@ -21,7 +21,7 @@ const STATUS_ENV = {
 
 // ── SUPABASE CONFIG ───────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://vxkqmrsdpjtoduezqocl.supabase.co";
-const SUPABASE_KEY = "sb_publishable_uzdzgDvbjy5oOuEfpqd32Q_ZRrLnhGPMTgKRc4";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4a3FtcnNkcGp0b2R1ZXpxb2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NTI5MjksImV4cCI6MjEwMTMyODkyOX0.1ni6hBFqJme1mspQ2pY0aBb-vZc_frv4NXkO3Xzvkrk";
 
 const sbFetch = async (path, opts={}) => {
   const r = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
