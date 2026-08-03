@@ -246,12 +246,21 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
     setAnalisando(true);
     try {
       const b64 = await toBase64(file);
-      const resp = await fetch("/api/analisar",{
+      const resp = await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({image:b64, mediaType:file.type, tipo:"pagamento"})
+        body: JSON.stringify({
+          model:"claude-sonnet-4-6",
+          max_tokens:200,
+          messages:[{role:"user",content:[
+            {type:"image",source:{type:"base64",media_type:file.type,data:b64}},
+            {type:"text",text:"Analise este comprovante de pagamento. Extraia APENAS o valor em reais. Responda SOMENTE com JSON: {\"valor\": 1250.00}"}
+          ]}]
+        })
       });
-      const parsed = await resp.json();
+      const data = await resp.json();
+      const txt = data.content?.[0]?.text||"{}";
+      const parsed = JSON.parse(txt.replace(/```json|```/g,"").trim());
       if(parsed.valor) setEntradaValor(String(parsed.valor));
     } catch(e) { alert("Não consegui ler o valor. Digite manualmente."); }
     setAnalisando(false);
@@ -411,12 +420,25 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
     setAnalisando(true);
     try {
       const b64 = await toBase64(file);
-      const resp = await fetch("/api/analisar",{
+      const resp = await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({image:b64, mediaType:file.type, tipo:"pagamento"})
+        body: JSON.stringify({
+          model:"claude-sonnet-4-6",
+          max_tokens:200,
+          messages:[{
+            role:"user",
+            content:[
+              {type:"image",source:{type:"base64",media_type:file.type,data:b64}},
+              {type:"text",text:"Analise este comprovante de pagamento/transferência. Extraia APENAS o valor em reais transferido. Responda SOMENTE com um JSON assim: {\"valor\": 1250.00}. Sem texto adicional."}
+            ]
+          }]
+        })
       });
-      const parsed = await resp.json();
+      const data = await resp.json();
+      const txt = data.content?.[0]?.text||"{}";
+      const clean = txt.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(clean);
       if(parsed.valor) setNovaEnt(String(parsed.valor));
     } catch(e) {
       alert("Não consegui ler o valor. Digite manualmente.");
@@ -439,12 +461,25 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
     setAnalisandoFrete(true);
     try {
       const b64 = await toBase64(file);
-      const resp = await fetch("/api/analisar",{
+      const resp = await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({image:b64, mediaType:file.type, tipo:"frete"})
+        body: JSON.stringify({
+          model:"claude-sonnet-4-6",
+          max_tokens:300,
+          messages:[{
+            role:"user",
+            content:[
+              {type:"image",source:{type:"base64",media_type:file.type,data:b64}},
+              {type:"text",text:"Analise este comprovante dos Correios ou transportadora. Extraia o código de rastreio (formato como AA123456789BR ou similar) e o valor do frete em reais. Responda SOMENTE com JSON: {\"rastreio\": \"AA123456789BR\", \"valor\": 45.50}. Sem texto adicional."}
+            ]
+          }]
+        })
       });
-      const parsed = await resp.json();
+      const data = await resp.json();
+      const txt = data.content?.[0]?.text||"{}";
+      const clean = txt.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(clean);
       if(parsed.rastreio) setRastreio(parsed.rastreio);
       if(parsed.valor) {
         const comMargem = (parsed.valor * 1.25).toFixed(2);
@@ -647,7 +682,6 @@ function ListaPedidos({pedidos, usuario, onSelecionar}) {
     {v:"pendente",l:"🔴 Pendente"},
     {v:"parcial",l:"🟡 Parcial"},
     {v:"quitado",l:"🟢 Quitado"},
-    {v:"aguardando",l:"📦 Ag. envio"},
     {v:"enviado",l:"🚚 Enviado"},
   ];
 
