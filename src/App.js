@@ -657,7 +657,7 @@ function ListaPedidos({pedidos, usuario, onSelecionar}) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("producao");
 
-  const base = (usuario.role==="admin" ? pedidos : pedidos.filter(p=>p.vendedor===usuario.nome))
+const base = pedidos
     .filter(p=> p.cliente.toLowerCase().includes(busca.toLowerCase())||p.telefone.includes(busca));
 
   const lista = base.filter(p=>{
