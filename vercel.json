@@ -1,0 +1,38 @@
+# Machado Sistemas — Gestão de Pedidos
+
+## Como publicar no Vercel
+
+### Passo 1 — GitHub
+1. Acesse github.com e crie uma conta (se não tiver)
+2. Clique em **"New repository"**
+3. Nome: `machado-sistemas`
+4. Clique em **"Create repository"**
+5. Faça upload de todos os arquivos desta pasta
+
+### Passo 2 — Vercel
+1. Acesse vercel.com
+2. Clique em **"Sign up"** → entre com sua conta GitHub
+3. Clique em **"Add New Project"**
+4. Selecione o repositório `machado-sistemas`
+5. Clique em **"Deploy"**
+6. Aguarde ~2 minutos
+7. Seu link estará disponível: `machado-sistemas.vercel.app`
+
+### Passo 3 — Instalar como app no celular (PWA)
+
+**iPhone (Safari):**
+1. Abra o link no Safari
+2. Toque no botão de compartilhar (quadrado com seta)
+3. Role e toque em **"Adicionar à Tela de Início"**
+4. Toque em **"Adicionar"**
+5. O app aparece na tela inicial igual a um app normal!
+
+**Android (Chrome):**
+1. Abra o link no Chrome
+2. Toque nos 3 pontos (menu)
+3. Toque em **"Adicionar à tela inicial"**
+4. Confirme
+
+## Usuários
+- Felipe: `felipe` / `felipe123`
+- Yasmin: `yasmin` / `yasmin123`
