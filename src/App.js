@@ -629,25 +629,59 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
   );
 }
 
+// ── HELPERS PRAZO ────────────────────────────────────────────────────────────
+const diasRestantes = (dataEnvio) => {
+  if(!dataEnvio) return null;
+  const hoje2 = new Date(); hoje2.setHours(0,0,0,0);
+  const env = new Date(dataEnvio+"T00:00:00"); env.setHours(0,0,0,0);
+  return Math.ceil((env-hoje2)/(1000*60*60*24));
+};
+
+const corPrazo = (dias) => {
+  if(dias === null) return S.dim;
+  if(dias <= 1) return "#EF4444";
+  if(dias <= 5) return "#F59E0B";
+  return "#10B981";
+};
+
+const labelPrazo = (dias) => {
+  if(dias === null) return "";
+  if(dias < 0) return `${Math.abs(dias)}d atrasado`;
+  if(dias === 0) return "Enviar hoje!";
+  if(dias === 1) return "Enviar amanhã!";
+  return `${dias}d para envio`;
+};
+
 // ── LISTA PEDIDOS ─────────────────────────────────────────────────────────────
 function ListaPedidos({pedidos, usuario, onSelecionar}) {
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState("todos");
+  const [filtro, setFiltro] = useState("producao");
 
-  const lista = (usuario.role==="admin" ? pedidos : pedidos.filter(p=>p.vendedor===usuario.nome))
-    .filter(p=>{
-      const ok = p.cliente.toLowerCase().includes(busca.toLowerCase())||p.telefone.includes(busca);
-      const sf2 = sfin(p);
-      return ok && (filtro==="todos"||sf2===filtro||p.statusEnvio===filtro);
-    })
-    .sort((a,b)=>new Date(b.criadoEm)-new Date(a.criadoEm));
+  const base = (usuario.role==="admin" ? pedidos : pedidos.filter(p=>p.vendedor===usuario.nome))
+    .filter(p=> p.cliente.toLowerCase().includes(busca.toLowerCase())||p.telefone.includes(busca));
+
+  const lista = base.filter(p=>{
+    if(filtro==="producao") return (p.statusEnvio||"aguardando")==="aguardando";
+    if(filtro==="enviados") return p.statusEnvio==="enviado"||p.statusEnvio==="entregue";
+    if(filtro==="pendentes") return sfin(p)==="pendente"||sfin(p)==="parcial";
+    return true;
+  }).sort((a,b)=>{
+    if(filtro==="producao") {
+      const da = diasRestantes(a.dataEnvio)||999;
+      const db = diasRestantes(b.dataEnvio)||999;
+      return da-db;
+    }
+    return new Date(b.criadoEm)-new Date(a.criadoEm);
+  });
+
+  const totalProducao = base.filter(p=>(p.statusEnvio||"aguardando")==="aguardando").length;
+  const totalPendentes = base.filter(p=>sfin(p)==="pendente"||sfin(p)==="parcial").length;
 
   const filtros = [
-    {v:"todos",l:"Todos"},
-    {v:"pendente",l:"🔴 Pendente"},
-    {v:"parcial",l:"🟡 Parcial"},
-    {v:"quitado",l:"🟢 Quitado"},
-    {v:"enviado",l:"🚚 Enviado"},
+    {v:"producao",l:"🔧 Em Produção", badge: totalProducao},
+    {v:"enviados",l:"🚚 Enviados"},
+    {v:"pendentes",l:"⚠️ Pendentes", badge: totalPendentes},
+    {v:"todos",l:"📋 Todos"},
   ];
 
   return (
@@ -662,7 +696,11 @@ function ListaPedidos({pedidos, usuario, onSelecionar}) {
           <button key={f.v} onClick={()=>setFiltro(f.v)} style={{
             background:filtro===f.v?S.verde:S.card, color:filtro===f.v?"#0D1117":S.sub,
             border:"none",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,
-          }}>{f.l}</button>
+            display:"flex",alignItems:"center",gap:5,
+          }}>
+            {f.l}
+            {f.badge>0 && <span style={{background:filtro===f.v?"#0D111788":"#EF444422",color:filtro===f.v?"#0D1117":"#EF4444",borderRadius:10,padding:"1px 6px",fontSize:11}}>{f.badge}</span>}
+          </button>
         ))}
       </div>
 
@@ -678,23 +716,38 @@ function ListaPedidos({pedidos, usuario, onSelecionar}) {
         {lista.map(p=>{
           const sf2 = sfin(p);
           const totalPago = (p.entradas||[]).reduce((s,e)=>s+(e.valor||0),0);
+          const dias = diasRestantes(p.dataEnvio);
+          const cor = filtro==="producao" ? corPrazo(dias) : STATUS_FIN[sf2].cor;
+          const pgtoFaltando = (sfin(p)==="pendente"||sfin(p)==="parcial") && (p.statusEnvio==="enviado"||p.statusEnvio==="entregue");
           return (
             <div key={p.id} onClick={()=>onSelecionar(p)}
-              style={{background:S.card,borderRadius:16,padding:16,marginBottom:12,cursor:"pointer",borderLeft:`4px solid ${STATUS_FIN[sf2].cor}`}}>
+              style={{background:S.card,borderRadius:16,padding:16,marginBottom:12,cursor:"pointer",borderLeft:`4px solid ${cor}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                 <div style={{fontSize:16,fontWeight:700,color:S.txt}}>{p.cliente}</div>
-                <Badge label={STATUS_FIN[sf2].label} cor={STATUS_FIN[sf2].cor}/>
+                {filtro==="producao" && dias!==null ? (
+                  <span style={{background:corPrazo(dias)+"22",color:corPrazo(dias),padding:"4px 10px",borderRadius:20,fontSize:12,fontWeight:700}}>
+                    {labelPrazo(dias)}
+                  </span>
+                ) : (
+                  <Badge label={STATUS_FIN[sf2].label} cor={STATUS_FIN[sf2].cor}/>
+                )}
               </div>
               <div style={{fontSize:13,color:S.sub,marginBottom:8}}>
                 {p.kits.map(k=>`Kit ${k.tam} (${k.volt})`).join(", ")}
               </div>
+              {pgtoFaltando && (
+                <div style={{background:"#EF444422",borderRadius:8,padding:"6px 10px",marginBottom:8,fontSize:12,color:"#EF4444",fontWeight:600}}>
+                  ⚠️ Pagamento pendente — {fmt(p.totalFinal - totalPago)} a receber
+                </div>
+              )}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div style={{fontSize:13}}>
                   <span style={{color:S.dim}}>Pago: </span>
                   <span style={{color:"#10B981",fontWeight:700}}>{fmt(totalPago)}</span>
                   <span style={{color:S.dim}}> / {fmt(p.totalFinal)}</span>
                 </div>
-                <Badge label={STATUS_ENV[p.statusEnvio||"aguardando"].label} cor={STATUS_ENV[p.statusEnvio||"aguardando"].cor}/>
+                {filtro!=="producao" && <Badge label={STATUS_ENV[p.statusEnvio||"aguardando"].label} cor={STATUS_ENV[p.statusEnvio||"aguardando"].cor}/>}
+                {filtro==="producao" && p.dataEnvio && <span style={{fontSize:12,color:S.dim}}>Prev: {fmtD(p.dataEnvio)}</span>}
               </div>
               <div style={{fontSize:12,color:S.dim,marginTop:8}}>
                 {fmtD(p.dataPedido)} · Tel: {p.telefone} · {p.vendedor}
