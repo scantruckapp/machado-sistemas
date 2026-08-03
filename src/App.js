@@ -498,7 +498,7 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
               <span style={{color:S.verde,fontWeight:700}}>{fmt(PRECOS_KIT[k.tam]*k.qtd)}</span>
             </div>
           ))}
-          {pedido.obs&&<div style={{marginTop:12,fontSize:13,color:S.sub,background:S.card2,padding:10,borderRadius:8}}>📝 {pedido.obs}</div>}
+          {pedido.obs&&<div style={{marginTop:14,background:"#F59E0B22",border:"2px solid #F59E0B",borderRadius:12,padding:"12px 14px",display:"flex",gap:10,alignItems:"flex-start"}}><span style={{fontSize:20}}>⚠️</span><div><div style={{fontSize:11,fontWeight:700,color:"#F59E0B",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Observações importantes</div><div style={{fontSize:14,color:S.txt,fontWeight:600,lineHeight:1.5}}>{pedido.obs}</div></div></div>}
         </Card>
 
         {/* Financeiro */}
