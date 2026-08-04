@@ -231,6 +231,19 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
   const [desc, setDesc] = useState(ed.desconto||0);
   const [obs, setObs] = useState(ed.obs||"");
   const [entradaValor, setEntradaValor] = useState("");
+  // Campos fiscais
+  const [clienteRazao, setClienteRazao] = useState(ed.clienteRazao||"");
+  const [clienteCnpj, setClienteCnpj] = useState(ed.clienteCnpj||"");
+  const [clienteEmail, setClienteEmail] = useState(ed.clienteEmail||"");
+  const [clienteCep, setClienteCep] = useState(ed.clienteCep||"");
+  const [clienteLogradouro, setClienteLogradouro] = useState(ed.clienteLogradouro||"");
+  const [clienteNumero, setClienteNumero] = useState(ed.clienteNumero||"");
+  const [clienteBairro, setClienteBairro] = useState(ed.clienteBairro||"");
+  const [clienteCidade, setClienteCidade] = useState(ed.clienteCidade||"");
+  const [clienteUf, setClienteUf] = useState(ed.clienteUf||"");
+  const [clienteIe, setClienteIe] = useState(ed.clienteIe||"");
+  const [formaPgto, setFormaPgto] = useState(ed.formaPgto||"pix");
+  const [mostrarFiscal, setMostrarFiscal] = useState(false);
   const [comprovante, setComprovante] = useState(null);
   const [analisando, setAnalisando] = useState(false);
 
@@ -278,6 +291,9 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
         : (ed.entradas||[]),
       statusEnvio: ed.statusEnvio||"aguardando",
       rastreio: ed.rastreio||"", frete: ed.frete||0,
+      clienteRazao, clienteCnpj, clienteEmail, clienteCep,
+      clienteLogradouro, clienteNumero, clienteBairro, clienteCidade,
+      clienteUf, clienteIe, formaPgto,
       criadoEm: ed.criadoEm||new Date().toISOString(),
     });
   };
@@ -366,6 +382,37 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
             <div style={{background:S.card2,borderRadius:10,padding:12,fontSize:13,color:S.dim}}>
               Saldo restante após entrada: <b style={{color:"#F59E0B"}}>{fmt((calcKit(kits,desc).total) - parseFloat(entradaValor))}</b>
             </div>
+          )}
+        </Card>
+
+        <Card>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:mostrarFiscal?12:0}}>
+            <div style={{fontSize:12,fontWeight:700,color:S.verde,textTransform:"uppercase",letterSpacing:1}}>🧾 Dados fiscais (NF-e)</div>
+            <button onClick={()=>setMostrarFiscal(!mostrarFiscal)} style={{background:"none",border:"1px solid "+S.borda,borderRadius:8,padding:"4px 12px",color:S.sub,fontSize:12,cursor:"pointer"}}>
+              {mostrarFiscal?"Ocultar":"Preencher"}
+            </button>
+          </div>
+          {mostrarFiscal&&(
+            <>
+              <Campo label="Razão Social / Nome completo" value={clienteRazao} onChange={setClienteRazao} placeholder="Nome ou Razão Social"/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Campo label="CPF ou CNPJ (só números)" value={clienteCnpj} onChange={setClienteCnpj} placeholder="00000000000"/>
+                <Campo label="IE (se tiver)" value={clienteIe} onChange={setClienteIe} placeholder="Opcional"/>
+              </div>
+              <Campo label="Email" value={clienteEmail} onChange={setClienteEmail} placeholder="email@cliente.com" type="email"/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Campo label="CEP" value={clienteCep} onChange={setClienteCep} placeholder="00000-000"/>
+                <Campo label="Número" value={clienteNumero} onChange={setClienteNumero} placeholder="123"/>
+              </div>
+              <Campo label="Logradouro" value={clienteLogradouro} onChange={setClienteLogradouro} placeholder="Rua, Av..."/>
+              <Campo label="Bairro" value={clienteBairro} onChange={setClienteBairro} placeholder="Bairro"/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Campo label="Cidade" value={clienteCidade} onChange={setClienteCidade} placeholder="Cidade"/>
+                <Campo label="UF" value={clienteUf} onChange={setClienteUf} placeholder="SC"/>
+              </div>
+              <Sel label="Forma de pagamento" value={formaPgto} onChange={setFormaPgto}
+                opts={[{v:"pix",l:"PIX"},{v:"cartao",l:"Cartão"},{v:"boleto",l:"Boleto"}]}/>
+            </>
           )}
         </Card>
       </div>
@@ -652,12 +699,91 @@ const labelPrazo = (dias) => {
   return `${dias}d para envio`;
 };
 
+// ── EMISSOR NF-e ──────────────────────────────────────────────────────────────
+function NfeEmissor({pedido, onAtualizar}) {
+  const [emitindo, setEmitindo] = useState(false);
+  const [statusNfe, setStatusNfe] = useState(pedido.statusNfe||"");
+  const [linkNfe, setLinkNfe] = useState(pedido.linkNfe||"");
+
+  const emitirNfe = async () => {
+    if(!pedido.clienteCnpj) return alert("Preencha os dados fiscais do cliente primeiro!");
+    if(!window.confirm("Confirma emissão da NF-e em HOMOLOGAÇÃO (teste)?")) return;
+    setEmitindo(true);
+    try {
+      const resp = await fetch("/api/nfe",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({pedido:{
+          id:pedido.id, kits:pedido.kits, totalFinal:pedido.totalFinal,
+          clienteRazao:pedido.clienteRazao,
+          clienteCnpj:pedido.clienteCnpj.replace(/\D/g,""),
+          clienteEmail:pedido.clienteEmail, clienteCep:pedido.clienteCep,
+          clienteLogradouro:pedido.clienteLogradouro, clienteNumero:pedido.clienteNumero,
+          clienteBairro:pedido.clienteBairro, clienteCidade:pedido.clienteCidade,
+          clienteUf:pedido.clienteUf||"SC", clienteIe:pedido.clienteIe,
+          formaPgto:pedido.formaPgto||"pix",
+        }})
+      });
+      const data = await resp.json();
+      if(resp.status===200||resp.status===201) {
+        setStatusNfe(data.status||"emitida");
+        if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
+        onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||""});
+        alert("✅ NF-e enviada! Status: "+(data.status||"processando"));
+      } else {
+        alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data)));
+      }
+    } catch(e){ alert("Erro: "+e.message); }
+    setEmitindo(false);
+  };
+
+  const consultarNfe = async () => {
+    setEmitindo(true);
+    try {
+      const resp = await fetch("/api/nfe?ref="+pedido.id);
+      const data = await resp.json();
+      setStatusNfe(data.status||"");
+      if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
+      onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||pedido.linkNfe});
+    } catch(e){ alert("Erro: "+e.message); }
+    setEmitindo(false);
+  };
+
+  return (
+    <div style={{padding:"0 16px 16px"}}>
+      <div style={{background:"#1E2530",borderRadius:16,padding:18,border:"1px solid #2D3748"}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#00C896",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>🧾 Nota Fiscal — Homologação</div>
+        {statusNfe&&(
+          <div style={{background:"#00C89611",border:"1px solid #00C896",borderRadius:10,padding:12,marginBottom:14}}>
+            <div style={{fontSize:13,color:"#9CA3AF",marginBottom:4}}>Status:</div>
+            <div style={{fontSize:14,fontWeight:700,color:"#00C896"}}>{statusNfe}</div>
+            {linkNfe&&<a href={linkNfe} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#3B82F6",display:"block",marginTop:8}}>📄 Ver DANFE</a>}
+          </div>
+        )}
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={emitirNfe} disabled={emitindo} style={{
+            flex:1,background:"#00C896",color:"#0D1117",border:"none",borderRadius:12,
+            padding:"12px 0",fontWeight:700,fontSize:14,cursor:emitindo?"not-allowed":"pointer",opacity:emitindo?0.7:1
+          }}>{emitindo?"⏳ Aguarde...":"🧾 Emitir NF-e"}</button>
+          {statusNfe&&<button onClick={consultarNfe} disabled={emitindo} style={{
+            background:"#2D3748",color:"#F1F5F9",border:"none",borderRadius:12,
+            padding:"12px 16px",fontWeight:600,fontSize:13,cursor:"pointer"
+          }}>🔄</button>}
+        </div>
+        <div style={{fontSize:11,color:"#6B7280",marginTop:10,textAlign:"center"}}>
+          ⚠️ Homologação — notas não têm valor fiscal
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── LISTA PEDIDOS ─────────────────────────────────────────────────────────────
 function ListaPedidos({pedidos, usuario, onSelecionar}) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("producao");
 
-const base = pedidos
+  const base = (usuario.role==="admin" ? pedidos : pedidos.filter(p=>p.vendedor===usuario.nome))
     .filter(p=> p.cliente.toLowerCase().includes(busca.toLowerCase())||p.telefone.includes(busca));
 
   const lista = base.filter(p=>{
