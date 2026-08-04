@@ -698,6 +698,7 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
           </Card>
         )}
       </div>
+      <NfeEmissor pedido={pedido} onAtualizar={onAtualizar}/>
     </div>
   );
 }
