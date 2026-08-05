@@ -2,10 +2,10 @@ export default async function handler(req, res) {
   // ── GET: consulta status ──────────────────────────────────────────────────
   if (req.method === 'GET') {
     const { ref } = req.query;
-    const TOKEN = 'U1RnipPxGRxuyVBG2YgdKWNSZuvcdjDp';
+    const TOKEN = 'nTDNWgdjRYRBwiGrCqbGDn83BoZn2pas'; // PRODUÇÃO
     try {
       const response = await fetch(
-        `https://homologacao.focusnfe.com.br/v2/nfe/${ref}`,
+        `https://api.focusnfe.com.br/v2/nfe/${ref}`,
         { headers: { 'Authorization': 'Basic ' + Buffer.from(TOKEN + ':').toString('base64') } }
       );
       return res.status(response.status).json(await response.json());
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { pedido } = req.body;
-  const TOKEN = 'U1RnipPxGRxuyVBG2YgdKWNSZuvcdjDp';
+  const TOKEN = 'nTDNWgdjRYRBwiGrCqbGDn83BoZn2pas'; // PRODUÇÃO
   const CNPJ_EMITENTE = '40478144000172';
 
   // ── Normaliza campos (camelCase e snake_case) ────────────────────────────
@@ -35,17 +35,13 @@ export default async function handler(req, res) {
 
   const cfop = uf === 'SC' ? '5102' : '6102';
 
-  // ── Data de emissão no fuso de Brasília ──────────────────────────────────
-  // Vercel roda em UTC. Subtraimos 10min para evitar rejeicao 703 (data futura).
+  // ── Data de emissão (Vercel roda em UTC, -00:00 evita rejeicao 703) ──────
   const agora = new Date(Date.now() - 10 * 60 * 1000);
   const pad = (n) => String(n).padStart(2,'0');
-  // Usa UTC puro (sem offset) — Vercel roda em UTC, offset -03:00 causava rejeicao 703  
   const dataEmissao = agora.getUTCFullYear() + '-' + pad(agora.getUTCMonth()+1) + '-' + pad(agora.getUTCDate()) + 'T' + pad(agora.getUTCHours()) + ':' + pad(agora.getUTCMinutes()) + ':' + pad(agora.getUTCSeconds()) + '-00:00';
 
-  // ── Itens: cada kit vira um item, valor unitário pelo preço do kit ────────
-  const PRECOS = { 1:1350, 2:1850, 3:2350, 4:2650, 5:2950, 6:3250 };
+  // ── Itens ─────────────────────────────────────────────────────────────────
   const itens = pedido.kits.map((kit, i) => {
-    // Usa totalFinal para que soma dos itens bata com valor_pagamento
     const totalQtd = pedido.kits.reduce((s,k)=>s+(Number(k.qtd)||1),0);
     const preco = Number((pedido.totalFinal / totalQtd).toFixed(2));
     const qtd   = Number(kit.qtd) || 1;
@@ -74,12 +70,10 @@ export default async function handler(req, res) {
   const pgtoMap = { pix: '17', cartao: '03', boleto: '01' };
   const pgtoCode = pgtoMap[formaPgto] || '17';
 
-  // ── Destinatário: CPF = 11 dígitos, CNPJ = 14 ────────────────────────────
+  // ── Destinatário ──────────────────────────────────────────────────────────
   const destDoc = cnpj.length === 14
     ? { cnpj_destinatario: cnpj }
     : { cpf_destinatario:  cnpj };
-
-  // ── IE: 1=contribuinte, 9=não contribuinte/CPF ───────────────────────────
   const indIE = (ie && cnpj.length === 14) ? 1 : 9;
 
   const nfeData = {
@@ -108,13 +102,13 @@ export default async function handler(req, res) {
       forma_pagamento:  pgtoCode,
       valor_pagamento:  Number(pedido.totalFinal.toFixed(2)),
     }],
-    modalidade_frete: 3,
+    modalidade_frete:   3,
     finalidade_emissao: 1,
   };
 
   try {
     const response = await fetch(
-      `https://homologacao.focusnfe.com.br/v2/nfe?ref=${pedido.id}`,
+      `https://api.focusnfe.com.br/v2/nfe?ref=${pedido.id}`,
       {
         method: 'POST',
         headers: {
@@ -127,7 +121,6 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // Retorna detalhes completos para facilitar debug
     if (!response.ok) {
       return res.status(response.status).json({
         mensagem: data.mensagem || JSON.stringify(data),
