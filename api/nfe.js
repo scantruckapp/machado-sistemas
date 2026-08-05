@@ -36,14 +36,17 @@ export default async function handler(req, res) {
   const cfop = uf === 'SC' ? '5102' : '6102';
 
   // ── Data de emissão no fuso de Brasília ──────────────────────────────────
-  const agora = new Date();
+  // Vercel roda em UTC. Subtraimos 10min para evitar rejeicao 703 (data futura).
+  const agora = new Date(Date.now() - 10 * 60 * 1000);
   const pad = (n) => String(n).padStart(2,'0');
-  const dataEmissao = `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}-03:00`;
+  const dataEmissao = agora.getUTCFullYear() + '-' + pad(agora.getUTCMonth()+1) + '-' + pad(agora.getUTCDate()) + 'T' + pad(agora.getUTCHours()) + ':' + pad(agora.getUTCMinutes()) + ':' + pad(agora.getUTCSeconds()) + '-03:00';
 
   // ── Itens: cada kit vira um item, valor unitário pelo preço do kit ────────
   const PRECOS = { 1:1350, 2:1850, 3:2350, 4:2650, 5:2950, 6:3250 };
   const itens = pedido.kits.map((kit, i) => {
-    const preco = PRECOS[kit.tam] || (pedido.totalFinal / pedido.kits.reduce((s,k)=>s+(k.qtd||1),0));
+    // Usa totalFinal para que soma dos itens bata com valor_pagamento
+    const totalQtd = pedido.kits.reduce((s,k)=>s+(Number(k.qtd)||1),0);
+    const preco = Number((pedido.totalFinal / totalQtd).toFixed(2));
     const qtd   = Number(kit.qtd) || 1;
     return {
       numero_item:               i + 1,
