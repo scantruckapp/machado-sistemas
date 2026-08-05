@@ -39,7 +39,8 @@ export default async function handler(req, res) {
   // Vercel roda em UTC. Subtraimos 10min para evitar rejeicao 703 (data futura).
   const agora = new Date(Date.now() - 10 * 60 * 1000);
   const pad = (n) => String(n).padStart(2,'0');
-  const dataEmissao = agora.getUTCFullYear() + '-' + pad(agora.getUTCMonth()+1) + '-' + pad(agora.getUTCDate()) + 'T' + pad(agora.getUTCHours()) + ':' + pad(agora.getUTCMinutes()) + ':' + pad(agora.getUTCSeconds()) + '-03:00';
+  // Usa UTC puro (sem offset) — Vercel roda em UTC, offset -03:00 causava rejeicao 703  
+  const dataEmissao = agora.getUTCFullYear() + '-' + pad(agora.getUTCMonth()+1) + '-' + pad(agora.getUTCDate()) + 'T' + pad(agora.getUTCHours()) + ':' + pad(agora.getUTCMinutes()) + ':' + pad(agora.getUTCSeconds()) + '-00:00';
 
   // ── Itens: cada kit vira um item, valor unitário pelo preço do kit ────────
   const PRECOS = { 1:1350, 2:1850, 3:2350, 4:2650, 5:2950, 6:3250 };
