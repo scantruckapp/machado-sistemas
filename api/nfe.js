@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       numero_item:               i + 1,
       codigo_produto:            `KIT${kit.tam}`,
       descricao:                 `Kit ${kit.tam} Balde${kit.tam > 1 ? 's' : ''} Automatico ${kit.volt || '220v'}`,
-      ncm:                       '84248990',
+      codigo_ncm:                '84248990',
       cfop:                      cfop,
       unidade_comercial:         'UN',
       quantidade_comercial:      qtd,
@@ -105,6 +105,7 @@ export default async function handler(req, res) {
       valor_pagamento:  Number(pedido.totalFinal.toFixed(2)),
     }],
     modalidade_frete: 3,
+    finalidade_emissao: 1,
   };
 
   try {
