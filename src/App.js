@@ -466,11 +466,40 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
   const [textoRastreio, setTextoRastreio] = useState("");
   const [copiado, setCopiado] = useState(false);
 
+  // ── ESTADOS NOVOS: edição de dados fiscais ──────────────────────────────
+  const [editFiscal, setEditFiscal] = useState(false);
+  const [fRazao, setFRazao] = useState(pedido.clienteRazao||"");
+  const [fCnpj, setFCnpj] = useState(pedido.clienteCnpj||"");
+  const [fEmail, setFEmail] = useState(pedido.clienteEmail||"");
+  const [fCep, setFCep] = useState(pedido.clienteCep||"");
+  const [fLogradouro, setFLogradouro] = useState(pedido.clienteLogradouro||"");
+  const [fNumero, setFNumero] = useState(pedido.clienteNumero||"");
+  const [fBairro, setFBairro] = useState(pedido.clienteBairro||"");
+  const [fCidade, setFCidade] = useState(pedido.clienteCidade||"");
+  const [fUf, setFUf] = useState(pedido.clienteUf||"");
+  const [fIe, setFIe] = useState(pedido.clienteIe||"");
+  const [fPgto, setFPgto] = useState(pedido.formaPgto||"pix");
+  const [salvandoFiscal, setSalvandoFiscal] = useState(false);
+
+  const salvarFiscal = async () => {
+    setSalvandoFiscal(true);
+    const atualizado = {
+      ...pedido,
+      clienteRazao: fRazao, clienteCnpj: fCnpj, clienteEmail: fEmail,
+      clienteCep: fCep, clienteLogradouro: fLogradouro, clienteNumero: fNumero,
+      clienteBairro: fBairro, clienteCidade: fCidade, clienteUf: fUf,
+      clienteIe: fIe, formaPgto: fPgto,
+    };
+    await onAtualizar(atualizado);
+    setSalvandoFiscal(false);
+    setEditFiscal(false);
+  };
+  // ────────────────────────────────────────────────────────────────────────────
+
   const totalPago = (pedido.entradas||[]).reduce((s,e)=>s+(e.valor||0),0);
   const saldo = pedido.totalFinal - totalPago;
   const sf = sfin(pedido);
 
-  // Converte imagem para base64
   const toBase64 = (file) => new Promise((res,rej)=>{
     const r = new FileReader();
     r.onload = () => res(r.result.split(",")[1]);
@@ -478,7 +507,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
     r.readAsDataURL(file);
   });
 
-  // Analisa comprovante de pagamento via IA
   const analisarComprovante = async (file) => {
     if(!file) return;
     setAnalisando(true);
@@ -506,7 +534,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
     setComprovante(null);
   };
 
-  // Analisa comprovante de frete via IA
   const analisarCompFrete = async (file) => {
     if(!file) return;
     setAnalisandoFrete(true);
@@ -522,7 +549,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
       if(parsed.valor) {
         const comMargem = (parsed.valor * 1.25).toFixed(2);
         setFrete(comMargem);
-        // Gera texto de rastreio automaticamente
         const txt2 = `CÓDIGO DE RASTREIO\n\n${parsed.rastreio||""}\n\nVALOR ENVIO ${fmt(parseFloat(comMargem))}`;
         setTextoRastreio(txt2);
       }
@@ -544,12 +570,14 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
     });
   };
 
-  // Gera texto de rastreio manualmente se já tiver os dados
   const gerarTexto = () => {
     if(!rastreio) return alert("Informe o código de rastreio!");
     const txt = `CÓDIGO DE RASTREIO\n\n${rastreio}\n\nVALOR ENVIO ${fmt(parseFloat(frete)||0)}`;
     setTextoRastreio(txt);
   };
+
+  // Verifica se dados fiscais já estão preenchidos
+  const temDadosFiscais = !!(pedido.clienteCnpj && pedido.clienteRazao);
 
   return (
     <div style={{background:S.bg,minHeight:"100vh",paddingBottom:40}}>
@@ -603,11 +631,8 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
             </div>
           </div>
 
-          {/* Registrar pagamento com comprovante */}
           <div style={{marginTop:16,background:S.card2,borderRadius:12,padding:14,border:"1px solid "+S.borda}}>
             <div style={{fontSize:13,color:S.sub,marginBottom:10,fontWeight:700}}>📎 Registrar pagamento</div>
-
-            {/* Upload comprovante */}
             <label style={{display:"block",background:"#00C89611",border:"2px dashed "+S.verde,borderRadius:10,padding:14,textAlign:"center",cursor:"pointer",marginBottom:10}}>
               <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
                 const f=e.target.files[0];
@@ -621,7 +646,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
                 <div style={{color:S.verde,fontSize:13}}>📷 Subir comprovante de pagamento<br/><span style={{color:S.dim,fontSize:11}}>A IA lê o valor automaticamente</span></div>
               )}
             </label>
-
             <div style={{display:"flex",gap:10,marginBottom:10}}>
               <input value={novaEnt} onChange={e=>setNovaEnt(e.target.value)} type="number" placeholder="Valor recebido (R$)"
                 style={{flex:1,background:S.bg,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
@@ -645,8 +669,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
             <>
               <Sel label="Status" value={statusEnv} onChange={setStatusEnv}
                 opts={Object.entries(STATUS_ENV).map(([v,l])=>({v,l:l.label}))}/>
-
-              {/* Upload comprovante frete */}
               <div style={{marginBottom:13}}>
                 <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>Comprovante de frete</div>
                 <label style={{display:"block",background:"#00C89611",border:"2px dashed "+S.verde,borderRadius:10,padding:14,textAlign:"center",cursor:"pointer"}}>
@@ -663,7 +685,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
                   )}
                 </label>
               </div>
-
               <Campo label="Código de rastreio" value={rastreio} onChange={setRastreio} placeholder="AA123456789BR"/>
               <Campo label="Valor frete cobrado (R$) — já com +25%" value={frete} onChange={v=>{setFrete(v);}} type="number" placeholder="0,00"/>
               <Btn onClick={salvarEnvio} v="primary" full>Salvar envio</Btn>
@@ -697,6 +718,86 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
             )}
           </Card>
         )}
+
+        {/* ── CARD NOVO: Dados Fiscais editáveis ────────────────────────────── */}
+        <Card>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editFiscal?16:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{fontSize:12,fontWeight:700,color:S.verde,textTransform:"uppercase",letterSpacing:1}}>🧾 Dados Fiscais (NF-e)</div>
+              {/* Indicador visual: preenchido ou vazio */}
+              {!editFiscal && (
+                <span style={{
+                  background: temDadosFiscais ? "#10B98122" : "#EF444422",
+                  color: temDadosFiscais ? "#10B981" : "#EF4444",
+                  fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:10,
+                }}>
+                  {temDadosFiscais ? "✓ Preenchido" : "⚠ Vazio"}
+                </span>
+              )}
+            </div>
+            <Btn onClick={()=>setEditFiscal(!editFiscal)} v="ghost" sz="sm">
+              {editFiscal ? "Cancelar" : temDadosFiscais ? "Editar" : "Preencher"}
+            </Btn>
+          </div>
+
+          {/* Modo visualização */}
+          {!editFiscal && temDadosFiscais && (
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[
+                {l:"Razão Social", v: pedido.clienteRazao},
+                {l:"CPF / CNPJ", v: pedido.clienteCnpj},
+                {l:"Email", v: pedido.clienteEmail},
+                {l:"Endereço", v: [pedido.clienteLogradouro, pedido.clienteNumero, pedido.clienteBairro].filter(Boolean).join(", ")},
+                {l:"Cidade / UF", v: [pedido.clienteCidade, pedido.clienteUf].filter(Boolean).join(" — ")},
+                {l:"CEP", v: pedido.clienteCep},
+                {l:"IE", v: pedido.clienteIe || "Não informada"},
+                {l:"Forma de pgto", v: pedido.formaPgto?.toUpperCase()},
+              ].filter(x=>x.v).map((x,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"5px 0",borderBottom:"1px solid "+S.borda}}>
+                  <span style={{color:S.dim}}>{x.l}</span>
+                  <span style={{color:S.txt,fontWeight:500,textAlign:"right",maxWidth:"60%"}}>{x.v}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Modo vazio + não editando */}
+          {!editFiscal && !temDadosFiscais && (
+            <div style={{background:"#EF444411",border:"1px dashed #EF4444",borderRadius:10,padding:14,textAlign:"center",marginTop:8}}>
+              <div style={{fontSize:13,color:"#EF4444",fontWeight:600,marginBottom:4}}>Dados fiscais não preenchidos</div>
+              <div style={{fontSize:12,color:S.dim}}>Clique em "Preencher" para adicionar os dados do cliente e habilitar a emissão da NF-e</div>
+            </div>
+          )}
+
+          {/* Modo edição */}
+          {editFiscal && (
+            <>
+              <Campo label="Razão Social / Nome completo" value={fRazao} onChange={setFRazao} placeholder="Nome ou Razão Social"/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Campo label="CPF ou CNPJ (só números)" value={fCnpj} onChange={setFCnpj} placeholder="00000000000"/>
+                <Campo label="IE (se tiver)" value={fIe} onChange={setFIe} placeholder="Opcional"/>
+              </div>
+              <Campo label="Email" value={fEmail} onChange={setFEmail} placeholder="email@cliente.com" type="email"/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Campo label="CEP" value={fCep} onChange={setFCep} placeholder="00000-000"/>
+                <Campo label="Número" value={fNumero} onChange={setFNumero} placeholder="123"/>
+              </div>
+              <Campo label="Logradouro" value={fLogradouro} onChange={setFLogradouro} placeholder="Rua, Av..."/>
+              <Campo label="Bairro" value={fBairro} onChange={setFBairro} placeholder="Bairro"/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Campo label="Cidade" value={fCidade} onChange={setFCidade} placeholder="Cidade"/>
+                <Campo label="UF" value={fUf} onChange={setFUf} placeholder="SC"/>
+              </div>
+              <Sel label="Forma de pagamento" value={fPgto} onChange={setFPgto}
+                opts={[{v:"pix",l:"PIX"},{v:"cartao",l:"Cartão"},{v:"boleto",l:"Boleto"}]}/>
+              <Btn onClick={salvarFiscal} v="primary" full disabled={salvandoFiscal}>
+                {salvandoFiscal ? "⏳ Salvando..." : "✓ Salvar Dados Fiscais"}
+              </Btn>
+            </>
+          )}
+        </Card>
+        {/* ────────────────────────────────────────────────────────────────── */}
+
       </div>
       <NfeEmissor pedido={pedido} onAtualizar={onAtualizar}/>
     </div>
