@@ -108,7 +108,7 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(
-      `https://api.focusnfe.com.br/v2/nfe?ref=${pedido.id}`,
+      `https://api.focusnfe.com.br/v2/nfe?ref=prod_${pedido.id}`,
       {
         method: 'POST',
         headers: {
