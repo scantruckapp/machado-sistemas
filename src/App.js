@@ -853,11 +853,11 @@ function NfeEmissor({pedido, onAtualizar}) {
         }})
       });
       const data = await resp.json();
-      if(resp.status===200||resp.status===201) {
+      if(resp.status===200||resp.status===201||resp.status===202) {
         setStatusNfe(data.status||"emitida");
         if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
         onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||""});
-        alert("✅ NF-e enviada! Status: "+(data.status||"processando"));
+        const msgStatus = data.status === "processando_autorizacao" ? "✅ NF-e enviada à SEFAZ!\n\nStatus: Processando autorização\n\nAguarde alguns segundos e clique em 🔄 para ver se foi autorizada." : "✅ NF-e enviada! Status: "+(data.status||"processando"); alert(msgStatus);
       } else {
         const detErros = data.erros && data.erros.length > 0 ? "\n\nDetalhes:\n" + data.erros.map(e => "• " + (e.codigo||"") + ": " + (e.mensagem||JSON.stringify(e))).join("\n") : ""; alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data))+detErros);
       }
