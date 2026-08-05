@@ -73,6 +73,7 @@ const carregarDados = async () => {
       formaPgto: r.forma_pgto,
       statusNfe: r.status_nfe,
       linkNfe: r.link_nfe,
+      nfeRef: r.nfe_ref,
     }));
   } catch(e) {
     console.error("Erro ao carregar:", e);
@@ -113,6 +114,7 @@ const salvarPedido = async (p) => {
     forma_pgto: p.formaPgto||null,
     status_nfe: p.statusNfe||null,
     link_nfe: p.linkNfe||null,
+    nfe_ref: p.nfeRef||null,
   };
   await sbFetch("/pedidos", {
     method: "POST",
@@ -939,6 +941,7 @@ function NfeEmissor({pedido, onAtualizar}) {
   const [emitindo, setEmitindo] = useState(false);
   const [statusNfe, setStatusNfe] = useState(pedido.statusNfe||"");
   const [linkNfe, setLinkNfe] = useState(pedido.linkNfe||"");
+  const [nfeRef, setNfeRef] = useState(pedido.nfeRef||"");
 
   const emitirNfe = async () => {
     if(!pedido.clienteCnpj) return alert("Preencha os dados fiscais do cliente primeiro!");
@@ -963,7 +966,9 @@ function NfeEmissor({pedido, onAtualizar}) {
       if(resp.status===200||resp.status===201||resp.status===202) {
         setStatusNfe(data.status||"emitida");
         if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
-        onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||""});
+        // Salva o ref único para consulta posterior
+        if(data.ref) setNfeRef(data.ref);
+        onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||"",nfeRef:data.ref||pedido.nfeRef||""});
         const msgStatus = data.status === "processando_autorizacao" ? "✅ NF-e enviada à SEFAZ!\n\nAguarde alguns segundos e clique em 🔄 para consultar o status." : "✅ NF-e enviada! Status: "+(data.status||"processando"); alert(msgStatus);
       } else {
         const detErros = data.erros && data.erros.length > 0 ? "\n\nDetalhes:\n" + data.erros.map(e => "• " + (e.codigo||"") + ": " + (e.mensagem||JSON.stringify(e))).join("\n") : ""; alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data))+detErros);
@@ -975,11 +980,12 @@ function NfeEmissor({pedido, onAtualizar}) {
   const consultarNfe = async () => {
     setEmitindo(true);
     try {
-      const resp = await fetch("/api/nfe?ref="+pedido.id);
+      const refConsulta = nfeRef || pedido.nfeRef || ("prod_"+pedido.id);
+      const resp = await fetch("/api/nfe?ref="+refConsulta);
       const data = await resp.json();
       setStatusNfe(data.status||"");
       if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
-      onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||pedido.linkNfe});
+      onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||pedido.linkNfe,nfeRef:nfeRef||pedido.nfeRef||""});
     } catch(e){ alert("Erro: "+e.message); }
     setEmitindo(false);
   };
