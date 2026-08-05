@@ -106,9 +106,12 @@ export default async function handler(req, res) {
     finalidade_emissao: 1,
   };
 
+  // Ref único por emissão — evita erro 539 de duplicidade
+  const nfeRef = `prod_${pedido.id}_${Date.now()}`;
+
   try {
     const response = await fetch(
-      `https://api.focusnfe.com.br/v2/nfe?ref=prod_${pedido.id}`,
+      `https://api.focusnfe.com.br/v2/nfe?ref=${nfeRef}`,
       {
         method: 'POST',
         headers: {
@@ -129,7 +132,8 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(response.status).json(data);
+    // Inclui o ref na resposta para o frontend poder consultar depois
+    return res.status(response.status).json({ ...data, ref: nfeRef });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
