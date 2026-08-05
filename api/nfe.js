@@ -70,10 +70,18 @@ export default async function handler(req, res) {
     };
   });
 
+  // Data de emissão — obrigatória pelo Focus NFe
+  const agora = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const dataEmissao = `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}-03:00`;
+
   // ── CORREÇÃO 2: emitente explícito no body ─────────────────────────────────
   const nfeData = {
     // EMITENTE — obrigatório em homologação via API
     cnpj_emitente: CNPJ_EMITENTE,
+
+    data_emissao: dataEmissao,
+    data_saida_entrada: dataEmissao,
 
     natureza_operacao: 'Venda de mercadoria',
     forma_pagamento: 0,
