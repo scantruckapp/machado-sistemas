@@ -270,6 +270,45 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
   const [clienteIe, setClienteIe] = useState(ed.clienteIe||"");
   const [formaPgto, setFormaPgto] = useState(ed.formaPgto||"pix");
   const [mostrarFiscal, setMostrarFiscal] = useState(false);
+  const [txtWhatsForm, setTxtWhatsForm] = useState("");
+  const [extraindoForm, setExtraindoForm] = useState(false);
+
+  const extrairDadosWhatsForm = async () => {
+    if(!txtWhatsForm.trim()) return alert("Cole o texto do WhatsApp primeiro!");
+    setExtraindoForm(true);
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: `Extraia os dados fiscais do texto abaixo e retorne APENAS um JSON válido, sem markdown, sem explicação:\n\n${txtWhatsForm}\n\nRetorne exatamente neste formato:\n{"razao":"","cnpj":"","email":"","cep":"","logradouro":"","numero":"","bairro":"","cidade":"","uf":"","ie":""}\n\nRegras: cnpj só números, cep só números, uf só 2 letras maiúsculas, ie só números (ou vazio se não tiver). Se algum campo não encontrar, deixe vazio.`
+          }]
+        })
+      });
+      const data = await resp.json();
+      const txt = data.content[0].text.trim();
+      const parsed = JSON.parse(txt);
+      if(parsed.razao)      setClienteRazao(parsed.razao);
+      if(parsed.cnpj)       setClienteCnpj(parsed.cnpj);
+      if(parsed.email)      setClienteEmail(parsed.email);
+      if(parsed.cep)        setClienteCep(parsed.cep);
+      if(parsed.logradouro) setClienteLogradouro(parsed.logradouro);
+      if(parsed.numero)     setClienteNumero(parsed.numero);
+      if(parsed.bairro)     setClienteBairro(parsed.bairro);
+      if(parsed.cidade)     setClienteCidade(parsed.cidade);
+      if(parsed.uf)         setClienteUf(parsed.uf);
+      if(parsed.ie)         setClienteIe(parsed.ie);
+      setMostrarFiscal(true);
+      setTxtWhatsForm("");
+    } catch(e) {
+      alert("Erro ao extrair dados. Preencha manualmente.");
+    }
+    setExtraindoForm(false);
+  };
   const [comprovante, setComprovante] = useState(null);
   const [analisando, setAnalisando] = useState(false);
 
@@ -420,6 +459,21 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
           </div>
           {mostrarFiscal&&(
             <>
+              {/* ── COLAR DO WHATSAPP ── */}
+              <div style={{background:"#00C89611",border:"2px dashed "+S.verde,borderRadius:12,padding:14,marginBottom:14}}>
+                <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>📋 Colar dados do WhatsApp</div>
+                <textarea
+                  value={txtWhatsForm}
+                  onChange={e=>setTxtWhatsForm(e.target.value)}
+                  placeholder={"Cole aqui o texto com os dados do cliente enviado pelo WhatsApp...\nEx: Razão Social: Ama Food Ltda\nCNPJ: 66.020.703/0001-90\nEndereço: Rua dos Aimorés..."}
+                  style={{width:"100%",background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:13,minHeight:90,boxSizing:"border-box",outline:"none",resize:"vertical",marginBottom:10}}
+                />
+                <Btn onClick={extrairDadosWhatsForm} v="primary" full disabled={extraindoForm}>
+                  {extraindoForm ? "⏳ Extraindo dados..." : "✨ Preencher automaticamente"}
+                </Btn>
+                <div style={{fontSize:11,color:S.dim,marginTop:8,textAlign:"center"}}>A IA identifica todos os campos automaticamente</div>
+              </div>
+              <div style={{fontSize:12,color:S.sub,marginBottom:10,textAlign:"center"}}>— ou preencha manualmente —</div>
               <Campo label="Razão Social / Nome completo" value={clienteRazao} onChange={setClienteRazao} placeholder="Nome ou Razão Social"/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <Campo label="CPF ou CNPJ (só números)" value={clienteCnpj} onChange={setClienteCnpj} placeholder="00000000000"/>
@@ -480,6 +534,44 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
   const [fIe, setFIe] = useState(pedido.clienteIe||"");
   const [fPgto, setFPgto] = useState(pedido.formaPgto||"pix");
   const [salvandoFiscal, setSalvandoFiscal] = useState(false);
+  const [txtWhats, setTxtWhats] = useState("");
+  const [extraindo, setExtraindo] = useState(false);
+
+  const extrairDadosWhats = async () => {
+    if(!txtWhats.trim()) return alert("Cole o texto do WhatsApp primeiro!");
+    setExtraindo(true);
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: `Extraia os dados fiscais do texto abaixo e retorne APENAS um JSON válido, sem markdown, sem explicação:\n\n${txtWhats}\n\nRetorne exatamente neste formato:\n{"razao":"","cnpj":"","email":"","cep":"","logradouro":"","numero":"","bairro":"","cidade":"","uf":"","ie":""}\n\nRegras: cnpj só números, cep só números, uf só 2 letras maiúsculas, ie só números (ou vazio se não tiver). Se algum campo não encontrar, deixe vazio.`
+          }]
+        })
+      });
+      const data = await resp.json();
+      const txt = data.content[0].text.trim();
+      const parsed = JSON.parse(txt);
+      if(parsed.razao)      setFRazao(parsed.razao);
+      if(parsed.cnpj)       setFCnpj(parsed.cnpj);
+      if(parsed.email)      setFEmail(parsed.email);
+      if(parsed.cep)        setFCep(parsed.cep);
+      if(parsed.logradouro) setFLogradouro(parsed.logradouro);
+      if(parsed.numero)     setFNumero(parsed.numero);
+      if(parsed.bairro)     setFBairro(parsed.bairro);
+      if(parsed.cidade)     setFCidade(parsed.cidade);
+      if(parsed.uf)         setFUf(parsed.uf);
+      if(parsed.ie)         setFIe(parsed.ie);
+      setTxtWhats("");
+    } catch(e) {
+      alert("Erro ao extrair dados. Preencha manualmente.");
+    }
+    setExtraindo(false);
+  };
 
   const salvarFiscal = async () => {
     setSalvandoFiscal(true);
@@ -772,6 +864,21 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
           {/* Modo edição */}
           {editFiscal && (
             <>
+              {/* ── COLAR DO WHATSAPP ── */}
+              <div style={{background:"#00C89611",border:"2px dashed "+S.verde,borderRadius:12,padding:14,marginBottom:14}}>
+                <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>📋 Colar dados do WhatsApp</div>
+                <textarea
+                  value={txtWhats}
+                  onChange={e=>setTxtWhats(e.target.value)}
+                  placeholder={"Cole aqui o texto com os dados do cliente enviado pelo WhatsApp...\nEx: Razão Social: Ama Food Ltda\nCNPJ: 66.020.703/0001-90\nEndereço: Rua dos Aimorés..."}
+                  style={{width:"100%",background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:13,minHeight:90,boxSizing:"border-box",outline:"none",resize:"vertical",marginBottom:10}}
+                />
+                <Btn onClick={extrairDadosWhats} v="primary" full disabled={extraindo}>
+                  {extraindo ? "⏳ Extraindo dados..." : "✨ Preencher automaticamente"}
+                </Btn>
+                <div style={{fontSize:11,color:S.dim,marginTop:8,textAlign:"center"}}>A IA identifica todos os campos automaticamente</div>
+              </div>
+              <div style={{fontSize:12,color:S.sub,marginBottom:10,textAlign:"center"}}>— ou preencha manualmente —</div>
               <Campo label="Razão Social / Nome completo" value={fRazao} onChange={setFRazao} placeholder="Nome ou Razão Social"/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <Campo label="CPF ou CNPJ (só números)" value={fCnpj} onChange={setFCnpj} placeholder="00000000000"/>
