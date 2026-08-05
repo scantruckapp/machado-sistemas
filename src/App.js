@@ -859,7 +859,7 @@ function NfeEmissor({pedido, onAtualizar}) {
         onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||""});
         alert("✅ NF-e enviada! Status: "+(data.status||"processando"));
       } else {
-        alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data)));
+        const detErros = data.erros && data.erros.length > 0 ? "\n\nDetalhes:\n" + data.erros.map(e => "• " + (e.codigo||"") + ": " + (e.mensagem||JSON.stringify(e))).join("\n") : ""; alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data))+detErros);
       }
     } catch(e){ alert("Erro: "+e.message); }
     setEmitindo(false);
