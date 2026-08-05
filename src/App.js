@@ -835,7 +835,7 @@ function NfeEmissor({pedido, onAtualizar}) {
 
   const emitirNfe = async () => {
     if(!pedido.clienteCnpj) return alert("Preencha os dados fiscais do cliente primeiro!");
-    if(!window.confirm("Confirma emissão da NF-e em HOMOLOGAÇÃO (teste)?")) return;
+    if(!window.confirm("Confirma emissão da NF-e?")) return;
     setEmitindo(true);
     try {
       const resp = await fetch("/api/nfe",{
@@ -857,7 +857,7 @@ function NfeEmissor({pedido, onAtualizar}) {
         setStatusNfe(data.status||"emitida");
         if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
         onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||""});
-        const msgStatus = data.status === "processando_autorizacao" ? "✅ NF-e enviada à SEFAZ!\n\nStatus: Processando autorização\n\nAguarde alguns segundos e clique em 🔄 para ver se foi autorizada." : "✅ NF-e enviada! Status: "+(data.status||"processando"); alert(msgStatus);
+        const msgStatus = data.status === "processando_autorizacao" ? "✅ NF-e enviada à SEFAZ!\n\nAguarde alguns segundos e clique em 🔄 para consultar o status." : "✅ NF-e enviada! Status: "+(data.status||"processando"); alert(msgStatus);
       } else {
         const detErros = data.erros && data.erros.length > 0 ? "\n\nDetalhes:\n" + data.erros.map(e => "• " + (e.codigo||"") + ": " + (e.mensagem||JSON.stringify(e))).join("\n") : ""; alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data))+detErros);
       }
@@ -880,7 +880,7 @@ function NfeEmissor({pedido, onAtualizar}) {
   return (
     <div style={{padding:"0 16px 16px"}}>
       <div style={{background:"#1E2530",borderRadius:16,padding:18,border:"1px solid #2D3748"}}>
-        <div style={{fontSize:12,fontWeight:700,color:"#00C896",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>🧾 Nota Fiscal — Homologação</div>
+        <div style={{fontSize:12,fontWeight:700,color:"#00C896",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>🧾 Nota Fiscal</div>
         {statusNfe&&(
           <div style={{background:"#00C89611",border:"1px solid #00C896",borderRadius:10,padding:12,marginBottom:14}}>
             <div style={{fontSize:13,color:"#9CA3AF",marginBottom:4}}>Status:</div>
@@ -898,9 +898,7 @@ function NfeEmissor({pedido, onAtualizar}) {
             padding:"12px 16px",fontWeight:600,fontSize:13,cursor:"pointer"
           }}>🔄</button>}
         </div>
-        <div style={{fontSize:11,color:"#6B7280",marginTop:10,textAlign:"center"}}>
-          ⚠️ Homologação — notas não têm valor fiscal
-        </div>
+        
       </div>
     </div>
   );
