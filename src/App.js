@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const USUARIOS = {
   felipe: { senha: "felipe123", nome: "Felipe", role: "admin" },
@@ -1262,7 +1262,7 @@ export default function App() {
   const [pedSel, setPedSel] = useState(null);
   const [loading, setLoading] = useState(true);
   // pedSelRef garante que o pedido selecionado não some durante re-renders assíncronos
-  const pedSelRef = React.useRef(null);
+  const pedSelRef = useRef(null);
 
   useEffect(()=>{ carregarDados().then(p=>{setPedidos(p);setLoading(false);}); },[]);
 
