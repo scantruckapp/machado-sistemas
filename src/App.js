@@ -670,6 +670,21 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
     setTextoRastreio(txt);
   };
 
+  // Sincroniza estados fiscais quando pedido é atualizado externamente (ex: ao voltar ao pedido)
+  useEffect(() => {
+    setFRazao(pedido.clienteRazao||"");
+    setFCnpj(pedido.clienteCnpj||"");
+    setFEmail(pedido.clienteEmail||"");
+    setFCep(pedido.clienteCep||"");
+    setFLogradouro(pedido.clienteLogradouro||"");
+    setFNumero(pedido.clienteNumero||"");
+    setFBairro(pedido.clienteBairro||"");
+    setFCidade(pedido.clienteCidade||"");
+    setFUf(pedido.clienteUf||"");
+    setFIe(pedido.clienteIe||"");
+    setFPgto(pedido.formaPgto||"pix");
+  }, [pedido.id, pedido.clienteCnpj, pedido.clienteRazao]);
+
   // Verifica se dados fiscais já estão preenchidos
   const temDadosFiscais = !!(pedido.clienteCnpj && pedido.clienteRazao);
 
@@ -1246,6 +1261,8 @@ export default function App() {
   const [subTela, setSubTela] = useState(null);
   const [pedSel, setPedSel] = useState(null);
   const [loading, setLoading] = useState(true);
+  // pedSelRef garante que o pedido selecionado não some durante re-renders assíncronos
+  const pedSelRef = React.useRef(null);
 
   useEffect(()=>{ carregarDados().then(p=>{setPedidos(p);setLoading(false);}); },[]);
 
@@ -1256,18 +1273,36 @@ export default function App() {
     salvar(lista);
     setSubTela(null);
     setPedSel(null);
+    pedSelRef.current = null;
   };
 
-  const onAtualizar = (p) => {
-    salvar(pedidos.map(x=>x.id===p.id?p:x));
+  const onAtualizar = async (p) => {
+    // 1. Atualiza ref e state imediatamente — impede que a tela feche
+    pedSelRef.current = p;
     setPedSel(p);
+    // 2. Atualiza lista em memória — quando usuário voltar, verá dados atualizados
+    setPedidos(prev => {
+      const lista = prev.map(x => x.id===p.id ? p : x);
+      // Salva localStorage sincronamente para garantir persistência local
+      localStorage.setItem("pedidos_ms", JSON.stringify(lista));
+      return lista;
+    });
+    // 3. Persiste no Supabase em background
+    try {
+      await salvarPedido(p);
+    } catch(e) {
+      console.error("Erro ao salvar no Supabase:", e);
+    }
   };
 
   if(!usuario) return <Login onLogin={setUsuario}/>;
 
+  // Usa pedSelRef.current como fallback para evitar que a tela feche durante saves assíncronos
+  const pedidoAtivo = pedSel || pedSelRef.current;
+
   if(subTela==="novo") return <FormPedido usuario={usuario} onSalvar={onSalvarPedido} onCancelar={()=>setSubTela(null)}/>;
-  if(subTela==="editar"&&pedSel) return <FormPedido usuario={usuario} pedidoInicial={pedSel} onSalvar={onSalvarPedido} onCancelar={()=>setSubTela(null)}/>;
-  if(subTela==="detalhe"&&pedSel) return <DetalhePedido pedido={pedSel} onVoltar={()=>{setSubTela(null);setPedSel(null);}} onAtualizar={onAtualizar}/>;
+  if(subTela==="editar"&&pedidoAtivo) return <FormPedido usuario={usuario} pedidoInicial={pedidoAtivo} onSalvar={onSalvarPedido} onCancelar={()=>setSubTela(null)}/>;
+  if(subTela==="detalhe"&&pedidoAtivo) return <DetalhePedido pedido={pedidoAtivo} onVoltar={()=>{setSubTela(null);setPedSel(null);pedSelRef.current=null;}} onAtualizar={onAtualizar}/>;
 
   return (
     <div style={{background:S.bg,minHeight:"100vh",maxWidth:600,margin:"0 auto",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
