@@ -116,20 +116,31 @@ const salvarPedido = async (p) => {
     link_nfe: p.linkNfe||null,
     nfe_ref: p.nfeRef||null,
   };
-  await sbFetch("/pedidos", {
-    method: "POST",
-    headers: { "Prefer": "resolution=merge-duplicates" },
-    body: JSON.stringify(row),
-  });
+  // Tenta UPDATE primeiro (pedido existente), depois INSERT (pedido novo)
+  try {
+    await sbFetch(`/pedidos?id=eq.${p.id}`, {
+      method: "PATCH",
+      body: JSON.stringify(row),
+    });
+  } catch(e) {
+    // Se PATCH falhar (registro não existe), faz INSERT
+    await sbFetch("/pedidos", {
+      method: "POST",
+      body: JSON.stringify(row),
+    });
+  }
 };
 
 const salvarDados = async (pedidos) => {
-  try {
-    await Promise.all(pedidos.map(p => salvarPedido(p)));
-    localStorage.setItem("pedidos_ms", JSON.stringify(pedidos));
-  } catch(e) {
-    console.error("Erro ao salvar:", e);
-    localStorage.setItem("pedidos_ms", JSON.stringify(pedidos));
+  // Salva localStorage imediatamente como backup
+  localStorage.setItem("pedidos_ms", JSON.stringify(pedidos));
+  // Salva sequencialmente para evitar rate limit do Supabase
+  for (const p of pedidos) {
+    try {
+      await salvarPedido(p);
+    } catch(e) {
+      console.error("Erro ao salvar pedido", p.id, e);
+    }
   }
 };
 
@@ -279,21 +290,13 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
     if(!txtWhatsForm.trim()) return alert("Cole o texto do WhatsApp primeiro!");
     setExtraindoForm(true);
     try {
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      const resp = await fetch("/api/extrair", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `Extraia os dados fiscais do texto abaixo e retorne APENAS um JSON válido, sem markdown, sem explicação:\n\n${txtWhatsForm}\n\nRetorne exatamente neste formato:\n{"razao":"","cnpj":"","email":"","cep":"","logradouro":"","numero":"","bairro":"","cidade":"","uf":"","ie":""}\n\nRegras: cnpj só números, cep só números, uf só 2 letras maiúsculas, ie só números (ou vazio se não tiver). Se algum campo não encontrar, deixe vazio.`
-          }]
-        })
+        body: JSON.stringify({ texto: txtWhatsForm })
       });
-      const data = await resp.json();
-      const txt = data.content[0].text.trim();
-      const parsed = JSON.parse(txt);
+      const parsed = await resp.json();
+      if(parsed.erro) throw new Error(parsed.erro);
       if(parsed.razao)      setClienteRazao(parsed.razao);
       if(parsed.cnpj)       setClienteCnpj(parsed.cnpj);
       if(parsed.email)      setClienteEmail(parsed.email);
@@ -543,21 +546,13 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
     if(!txtWhats.trim()) return alert("Cole o texto do WhatsApp primeiro!");
     setExtraindo(true);
     try {
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      const resp = await fetch("/api/extrair", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `Extraia os dados fiscais do texto abaixo e retorne APENAS um JSON válido, sem markdown, sem explicação:\n\n${txtWhats}\n\nRetorne exatamente neste formato:\n{"razao":"","cnpj":"","email":"","cep":"","logradouro":"","numero":"","bairro":"","cidade":"","uf":"","ie":""}\n\nRegras: cnpj só números, cep só números, uf só 2 letras maiúsculas, ie só números (ou vazio se não tiver). Se algum campo não encontrar, deixe vazio.`
-          }]
-        })
+        body: JSON.stringify({ texto: txtWhats })
       });
-      const data = await resp.json();
-      const txt = data.content[0].text.trim();
-      const parsed = JSON.parse(txt);
+      const parsed = await resp.json();
+      if(parsed.erro) throw new Error(parsed.erro);
       if(parsed.razao)      setFRazao(parsed.razao);
       if(parsed.cnpj)       setFCnpj(parsed.cnpj);
       if(parsed.email)      setFEmail(parsed.email);
@@ -1268,30 +1263,50 @@ export default function App() {
 
   const salvar = async (lista) => { setPedidos(lista); await salvarDados(lista); };
 
-  const onSalvarPedido = (p) => {
+  const onSalvarPedido = async (p) => {
     const lista = pedidos.find(x=>x.id===p.id) ? pedidos.map(x=>x.id===p.id?p:x) : [p,...pedidos];
-    salvar(lista);
+    // Atualiza estado e localStorage imediatamente
+    setPedidos(lista);
+    localStorage.setItem("pedidos_ms", JSON.stringify(lista));
+    // Navega de volta imediatamente
     setSubTela(null);
     setPedSel(null);
     pedSelRef.current = null;
+    // Salva no Supabase em background com retry
+    let tentativas = 0;
+    while (tentativas < 3) {
+      try {
+        await salvarPedido(p);
+        break;
+      } catch(e) {
+        tentativas++;
+        console.error(`Tentativa ${tentativas} salvar pedido:`, e);
+        if (tentativas < 3) await new Promise(r => setTimeout(r, 1000 * tentativas));
+      }
+    }
   };
 
   const onAtualizar = async (p) => {
-    // 1. Atualiza ref e state imediatamente — impede que a tela feche
+    // 1. Atualiza navegação imediatamente
     pedSelRef.current = p;
     setPedSel(p);
-    // 2. Atualiza lista em memória — quando usuário voltar, verá dados atualizados
+    // 2. Atualiza lista em memória
     setPedidos(prev => {
       const lista = prev.map(x => x.id===p.id ? p : x);
-      // Salva localStorage sincronamente para garantir persistência local
       localStorage.setItem("pedidos_ms", JSON.stringify(lista));
       return lista;
     });
-    // 3. Persiste no Supabase em background
-    try {
-      await salvarPedido(p);
-    } catch(e) {
-      console.error("Erro ao salvar no Supabase:", e);
+    // 3. Persiste no Supabase com retry
+    let tentativas = 0;
+    while (tentativas < 3) {
+      try {
+        await salvarPedido(p);
+        break; // sucesso
+      } catch(e) {
+        tentativas++;
+        console.error(`Tentativa ${tentativas} falhou:`, e);
+        if (tentativas < 3) await new Promise(r => setTimeout(r, 1000 * tentativas));
+      }
     }
   };
 
