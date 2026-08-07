@@ -529,7 +529,7 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
 }
 
 // ── DETALHE PEDIDO ────────────────────────────────────────────────────────────
-function DetalhePedido({pedido, onVoltar, onAtualizar}) {
+function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar}) {
   const [novaEnt, setNovaEnt] = useState("");
   const [comprovante, setComprovante] = useState(null);
   const [analisando, setAnalisando] = useState(false);
@@ -704,10 +704,11 @@ function DetalhePedido({pedido, onVoltar, onAtualizar}) {
     <div style={{background:S.bg,minHeight:"100vh",paddingBottom:40}}>
       <div style={{background:S.card,padding:"14px 18px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:10}}>
         <button onClick={onVoltar} style={{background:"none",border:"none",color:S.sub,fontSize:22,cursor:"pointer",padding:4}}>←</button>
-        <div>
+        <div style={{flex:1}}>
           <div style={{fontSize:17,fontWeight:700,color:S.txt}}>{pedido.cliente}</div>
           <div style={{fontSize:12,color:S.dim}}>Tel: {pedido.telefone} · {fmtD(pedido.dataPedido)} · {pedido.vendedor}</div>
         </div>
+        <button onClick={onEditar} style={{background:"#2D3748",border:"none",color:S.txt,borderRadius:10,padding:"7px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}}>✏️ Editar</button>
       </div>
 
       <div style={{padding:16}}>
@@ -1339,7 +1340,7 @@ export default function App() {
 
   if(subTela==="novo") return <FormPedido usuario={usuario} onSalvar={onSalvarPedido} onCancelar={()=>setSubTela(null)}/>;
   if(subTela==="editar"&&pedidoAtivo) return <FormPedido usuario={usuario} pedidoInicial={pedidoAtivo} onSalvar={onSalvarPedido} onCancelar={()=>setSubTela(null)}/>;
-  if(subTela==="detalhe"&&pedidoAtivo) return <DetalhePedido pedido={pedidoAtivo} onVoltar={()=>{setSubTela(null);setPedSel(null);pedSelRef.current=null;}} onAtualizar={onAtualizar}/>;
+  if(subTela==="detalhe"&&pedidoAtivo) return <DetalhePedido pedido={pedidoAtivo} onVoltar={()=>{setSubTela(null);setPedSel(null);pedSelRef.current=null;}} onAtualizar={onAtualizar} onEditar={()=>setSubTela("editar")}/>;
 
   return (
     <div style={{background:S.bg,minHeight:"100vh",maxWidth:600,margin:"0 auto",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
