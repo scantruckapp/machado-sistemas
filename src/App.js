@@ -116,18 +116,35 @@ const salvarPedido = async (p) => {
     link_nfe: p.linkNfe||null,
     nfe_ref: p.nfeRef||null,
   };
-  // Tenta UPDATE primeiro (pedido existente), depois INSERT (pedido novo)
-  try {
-    await sbFetch(`/pedidos?id=eq.${p.id}`, {
-      method: "PATCH",
-      body: JSON.stringify(row),
-    });
-  } catch(e) {
-    // Se PATCH falhar (registro não existe), faz INSERT
-    await sbFetch("/pedidos", {
+  // PATCH para atualizar, com log detalhado para debug
+  const patchResp = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${p.id}`, {
+    method: "PATCH",
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation",
+    },
+    body: JSON.stringify(row),
+  });
+  const patchTxt = await patchResp.text();
+  const patchData = patchTxt ? JSON.parse(patchTxt) : [];
+  // Se PATCH não atualizou nenhum registro (array vazio), faz INSERT
+  if (!patchResp.ok || (Array.isArray(patchData) && patchData.length === 0)) {
+    const postResp = await fetch(`${SUPABASE_URL}/rest/v1/pedidos`, {
       method: "POST",
+      headers: {
+        "apikey": SUPABASE_KEY,
+        "Authorization": `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+      },
       body: JSON.stringify(row),
     });
+    if (!postResp.ok) {
+      const postErr = await postResp.text();
+      throw new Error(`INSERT falhou: ${postErr}`);
+    }
   }
 };
 
@@ -1296,17 +1313,22 @@ export default function App() {
       localStorage.setItem("pedidos_ms", JSON.stringify(lista));
       return lista;
     });
-    // 3. Persiste no Supabase com retry
+    // 3. Persiste no Supabase com retry e alerta visível em caso de falha
     let tentativas = 0;
+    let salvoOk = false;
     while (tentativas < 3) {
       try {
         await salvarPedido(p);
-        break; // sucesso
+        salvoOk = true;
+        break;
       } catch(e) {
         tentativas++;
-        console.error(`Tentativa ${tentativas} falhou:`, e);
-        if (tentativas < 3) await new Promise(r => setTimeout(r, 1000 * tentativas));
+        console.error(`Tentativa ${tentativas} falhou:`, e.message);
+        if (tentativas < 3) await new Promise(r => setTimeout(r, 1500));
       }
+    }
+    if (!salvoOk) {
+      alert("⚠️ ATENÇÃO: Não foi possível salvar no servidor.\n\nOs dados estão salvos localmente neste dispositivo, mas podem ser perdidos se você limpar o cache ou acessar de outro aparelho.\n\nTente novamente em alguns segundos.");
     }
   };
 
