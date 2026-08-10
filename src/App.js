@@ -1506,6 +1506,7 @@ export default function App() {
           <span style={{fontSize:26}}>🪣</span>
           <div>
             <div style={{fontSize:15,fontWeight:800,color:S.verde,letterSpacing:-0.5}}>MACHADO SISTEMAS</div>
+          <div style={{fontSize:9,color:S.dim,letterSpacing:0}}>v2.1</div>
             <div style={{fontSize:11,color:S.dim}}>Olá, {usuario.nome}! 👋</div>
           </div>
         </div>
