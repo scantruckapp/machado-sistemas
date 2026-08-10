@@ -41,7 +41,30 @@ export default async function handler(req, res) {
   const dataEmissao = agora.getUTCFullYear() + '-' + pad(agora.getUTCMonth()+1) + '-' + pad(agora.getUTCDate()) + 'T' + pad(agora.getUTCHours()) + ':' + pad(agora.getUTCMinutes()) + ':' + pad(agora.getUTCSeconds()) + '-00:00';
 
   // ── Itens ─────────────────────────────────────────────────────────────────
-  const itens = pedido.kits.map((kit, i) => {
+  // Suporte a NF-e avulsa com valor e descrição customizados
+  const isAvulsa = !!pedido.avulsa;
+  const valorAvulso = pedido.valorAvulso || pedido.totalFinal;
+  const descAvulsa = pedido.descricaoAvulsa || 'Kit Automatico';
+
+  const itens = isAvulsa ? [{
+    numero_item:               1,
+    codigo_produto:            'AVULSO',
+    descricao:                 descAvulsa,
+    codigo_ncm:                '84248990',
+    cfop:                      cfop,
+    unidade_comercial:         'UN',
+    quantidade_comercial:      1,
+    valor_unitario_comercial:  Number(valorAvulso.toFixed(2)),
+    valor_unitario_tributavel: Number(valorAvulso.toFixed(2)),
+    quantidade_tributavel:     1,
+    unidade_tributavel:        'UN',
+    valor_bruto:               Number(valorAvulso.toFixed(2)),
+    inclui_no_total:           1,
+    icms_situacao_tributaria:  '400',
+    icms_origem:               0,
+    pis_situacao_tributaria:   '07',
+    cofins_situacao_tributaria:'07',
+  }] : pedido.kits.map((kit, i) => {
     const totalQtd = pedido.kits.reduce((s,k)=>s+(Number(k.qtd)||1),0);
     const preco = Number((pedido.totalFinal / totalQtd).toFixed(2));
     const qtd   = Number(kit.qtd) || 1;
@@ -74,7 +97,8 @@ export default async function handler(req, res) {
   const destDoc = cnpj.length === 14
     ? { cnpj_destinatario: cnpj }
     : { cpf_destinatario:  cnpj };
-  const indIE = (ie && cnpj.length === 14) ? 1 : 9;
+  // IE: 1=contribuinte (CNPJ+IE), 9=nao contribuinte/CPF sem IE
+  const indIE = (cnpj.length === 14 && ie && ie.trim()) ? 1 : 9;
 
   const nfeData = {
     cnpj_emitente:              CNPJ_EMITENTE,
