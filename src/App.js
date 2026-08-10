@@ -1266,6 +1266,162 @@ function Dashboard({pedidos, usuario}) {
   );
 }
 
+
+// ── NF-e AVULSA ──────────────────────────────────────────────────────────────
+function NfeAvulsa() {
+  const [razao, setRazao] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [ie, setIe] = useState("");
+  const [email, setEmail] = useState("");
+  const [cep, setCep] = useState("");
+  const [logradouro, setLogradouro] = useState("");
+  const [numero, setNumero] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [uf, setUf] = useState("");
+  const [valor, setValor] = useState("");
+  const [descricao, setDescricao] = useState("Kit Automatico");
+  const [formaPgto, setFormaPgto] = useState("pix");
+  const [emitindo, setEmitindo] = useState(false);
+  const [statusNfe, setStatusNfe] = useState("");
+  const [linkNfe, setLinkNfe] = useState("");
+  const [txtWhats, setTxtWhats] = useState("");
+  const [extraindo, setExtraindo] = useState(false);
+
+  const extrairDados = async () => {
+    if(!txtWhats.trim()) return alert("Cole o texto primeiro!");
+    setExtraindo(true);
+    try {
+      const resp = await fetch("/api/extrair", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ texto: txtWhats })
+      });
+      const parsed = await resp.json();
+      if(parsed.erro) throw new Error(parsed.erro);
+      if(parsed.razao)      setRazao(parsed.razao);
+      if(parsed.cnpj)       setCnpj(parsed.cnpj);
+      if(parsed.email)      setEmail(parsed.email);
+      if(parsed.cep)        setCep(parsed.cep);
+      if(parsed.logradouro) setLogradouro(parsed.logradouro);
+      if(parsed.numero)     setNumero(parsed.numero);
+      if(parsed.bairro)     setBairro(parsed.bairro);
+      if(parsed.cidade)     setCidade(parsed.cidade);
+      if(parsed.uf)         setUf(parsed.uf);
+      if(parsed.ie)         setIe(parsed.ie);
+      setTxtWhats("");
+    } catch(e) { alert("Erro ao extrair. Preencha manualmente."); }
+    setExtraindo(false);
+  };
+
+  const emitir = async () => {
+    if(!cnpj || !razao) return alert("Preencha pelo menos Razão Social e CPF/CNPJ!");
+    if(!valor || parseFloat(valor) <= 0) return alert("Informe o valor da nota!");
+    if(!window.confirm(`Confirma emissão de NF-e avulsa\n\nDestinatário: ${razao}\nValor: R$ ${parseFloat(valor).toLocaleString("pt-BR", {minimumFractionDigits:2})}\n\nEsta nota terá VALOR FISCAL.`)) return;
+    setEmitindo(true);
+    setStatusNfe("");
+    setLinkNfe("");
+    try {
+      const refAvulsa = `avulsa_${Date.now()}`;
+      const resp = await fetch("/api/nfe", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({pedido:{
+          id: refAvulsa,
+          kits: [{tam: 1, qtd: 1, volt: "220v"}],
+          totalFinal: parseFloat(valor),
+          descricaoCustom: descricao,
+          clienteRazao: razao,
+          clienteCnpj: cnpj.replace(/\D/g,""),
+          clienteEmail: email,
+          clienteCep: cep,
+          clienteLogradouro: logradouro,
+          clienteNumero: numero,
+          clienteBairro: bairro,
+          clienteCidade: cidade,
+          clienteUf: uf || "SC",
+          clienteIe: ie,
+          formaPgto: formaPgto,
+          avulsa: true,
+          valorAvulso: parseFloat(valor),
+          descricaoAvulsa: descricao,
+        }})
+      });
+      const data = await resp.json();
+      if(resp.status===200||resp.status===201||resp.status===202) {
+        setStatusNfe(data.status||"processando");
+        if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
+        alert("✅ NF-e enviada à SEFAZ!\n\nAguarde alguns segundos e consulte o status.");
+      } else {
+        const detErros = data.erros&&data.erros.length>0 ? "\n\nDetalhes:\n"+data.erros.map(e=>"• "+(e.codigo||"")+": "+(e.mensagem||JSON.stringify(e))).join("\n") : "";
+        alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data))+detErros);
+      }
+    } catch(e){ alert("Erro: "+e.message); }
+    setEmitindo(false);
+  };
+
+  return (
+    <div style={{padding:16,paddingBottom:100}}>
+      <div style={{fontSize:16,fontWeight:800,color:S.verde,marginBottom:16,textTransform:"uppercase",letterSpacing:1}}>🧾 Emissão Avulsa de NF-e</div>
+
+      {/* Colar do WhatsApp */}
+      <Card>
+        <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>📋 Colar dados do WhatsApp</div>
+        <textarea value={txtWhats} onChange={e=>setTxtWhats(e.target.value)}
+          placeholder={"Cole aqui os dados do cliente enviados pelo WhatsApp..."}
+          style={{width:"100%",background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:13,minHeight:80,boxSizing:"border-box",outline:"none",resize:"vertical",marginBottom:10}}/>
+        <Btn onClick={extrairDados} v="primary" full disabled={extraindo}>
+          {extraindo?"⏳ Extraindo...":"✨ Preencher automaticamente"}
+        </Btn>
+      </Card>
+
+      {/* Dados do destinatário */}
+      <Card>
+        <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Destinatário</div>
+        <Campo label="Razão Social / Nome completo" value={razao} onChange={setRazao} placeholder="Nome ou Razão Social"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Campo label="CPF ou CNPJ (só números)" value={cnpj} onChange={setCnpj} placeholder="00000000000"/>
+          <Campo label="IE (se tiver)" value={ie} onChange={setIe} placeholder="Opcional"/>
+        </div>
+        <Campo label="Email" value={email} onChange={setEmail} placeholder="email@cliente.com" type="email"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Campo label="CEP" value={cep} onChange={setCep} placeholder="00000-000"/>
+          <Campo label="Número" value={numero} onChange={setNumero} placeholder="123"/>
+        </div>
+        <Campo label="Logradouro" value={logradouro} onChange={setLogradouro} placeholder="Rua, Av..."/>
+        <Campo label="Bairro" value={bairro} onChange={setBairro} placeholder="Bairro"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Campo label="Cidade" value={cidade} onChange={setCidade} placeholder="Cidade"/>
+          <Campo label="UF" value={uf} onChange={setUf} placeholder="SC"/>
+        </div>
+      </Card>
+
+      {/* Valor e descrição */}
+      <Card>
+        <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Nota Fiscal</div>
+        <Campo label="Valor (R$)" value={valor} onChange={setValor} type="number" placeholder="0,00"/>
+        <Campo label="Descrição do produto/serviço" value={descricao} onChange={setDescricao} placeholder="Kit Automatico 220v"/>
+        <Sel label="Forma de pagamento" value={formaPgto} onChange={setFormaPgto}
+          opts={[{v:"pix",l:"PIX"},{v:"cartao",l:"Cartão"},{v:"boleto",l:"Boleto"}]}/>
+      </Card>
+
+      {/* Status */}
+      {statusNfe&&(
+        <Card>
+          <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Status</div>
+          <div style={{fontSize:14,fontWeight:700,color:S.verde,marginBottom:8}}>{statusNfe}</div>
+          {linkNfe&&<a href={linkNfe} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#3B82F6"}}>📄 Ver DANFE</a>}
+        </Card>
+      )}
+
+      {/* Botão emitir */}
+      <Btn onClick={emitir} v="primary" sz="lg" full disabled={emitindo}>
+        {emitindo?"⏳ Emitindo...":"🧾 Emitir NF-e"}
+      </Btn>
+    </div>
+  );
+}
+
 // ── APP ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const [usuario, setUsuario] = useState(null);
@@ -1370,6 +1526,7 @@ export default function App() {
           <>
             {tela==="pedidos"&&<ListaPedidos pedidos={pedidos} usuario={usuario} onSelecionar={p=>{setPedSel(p);setSubTela("detalhe");}}/>}
             {tela==="dashboard"&&<Dashboard pedidos={pedidos} usuario={usuario}/>}
+            {tela==="nfeavulsa"&&usuario.role==="admin"&&<NfeAvulsa/>}
           </>
         )}
       </div>
@@ -1379,6 +1536,7 @@ export default function App() {
         {[
           {id:"pedidos",icon:"📦",l:"Pedidos"},
           ...(usuario.role==="admin"?[{id:"dashboard",icon:"📊",l:"Relatórios"}]:[]),
+          ...(usuario.role==="admin"?[{id:"nfeavulsa",icon:"🧾",l:"NF-e"}]:[]),
         ].map(n=>(
           <button key={n.id} onClick={()=>setTela(n.id)} style={{
             flex:1,background:"none",border:"none",padding:"13px 0",cursor:"pointer",
