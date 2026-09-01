@@ -529,7 +529,7 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
 }
 
 // ── DETALHE PEDIDO ────────────────────────────────────────────────────────────
-function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar}) {
+function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usuario}) {
   const [novaEnt, setNovaEnt] = useState("");
   const [comprovante, setComprovante] = useState(null);
   const [analisando, setAnalisando] = useState(false);
@@ -709,6 +709,7 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar}) {
           <div style={{fontSize:12,color:S.dim}}>Tel: {pedido.telefone} · {fmtD(pedido.dataPedido)} · {pedido.vendedor}</div>
         </div>
         <button onClick={onEditar} style={{background:"#2D3748",border:"none",color:S.txt,borderRadius:10,padding:"7px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}}>✏️ Editar</button>
+        {usuario?.role==="admin"&&<button onClick={()=>onDeletar(pedido.id)} style={{background:"#EF444422",border:"none",color:"#EF4444",borderRadius:10,padding:"7px 14px",fontSize:13,fontWeight:700,cursor:"pointer",marginLeft:6}}>🗑️</button>}
       </div>
 
       <div style={{padding:16}}>
@@ -1461,6 +1462,25 @@ export default function App() {
     }
   };
 
+  const deletarPedido = async (id) => {
+    if(!window.confirm("Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.")) return;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${id}`, {
+        method: "DELETE",
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+    } catch(e) { console.error("Erro ao deletar:", e); }
+    const lista = pedidos.filter(x => x.id !== id);
+    setPedidos(lista);
+    localStorage.setItem("pedidos_ms", JSON.stringify(lista));
+    setSubTela(null);
+    setPedSel(null);
+    pedSelRef.current = null;
+  };
+
   const onAtualizar = async (p) => {
     // 1. Atualiza navegação imediatamente
     pedSelRef.current = p;
@@ -1497,7 +1517,7 @@ export default function App() {
 
   if(subTela==="novo") return <FormPedido usuario={usuario} onSalvar={onSalvarPedido} onCancelar={()=>setSubTela(null)}/>;
   if(subTela==="editar"&&pedidoAtivo) return <FormPedido usuario={usuario} pedidoInicial={pedidoAtivo} onSalvar={onSalvarPedido} onCancelar={()=>setSubTela(null)}/>;
-  if(subTela==="detalhe"&&pedidoAtivo) return <DetalhePedido pedido={pedidoAtivo} onVoltar={()=>{setSubTela(null);setPedSel(null);pedSelRef.current=null;}} onAtualizar={onAtualizar} onEditar={()=>setSubTela("editar")}/>;
+  if(subTela==="detalhe"&&pedidoAtivo) return <DetalhePedido pedido={pedidoAtivo} onVoltar={()=>{setSubTela(null);setPedSel(null);pedSelRef.current=null;}} onAtualizar={onAtualizar} onEditar={()=>setSubTela("editar")} onDeletar={deletarPedido} usuario={usuario}/>;
 
   return (
     <div style={{background:S.bg,minHeight:"100vh",maxWidth:600,margin:"0 auto",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
