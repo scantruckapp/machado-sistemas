@@ -300,6 +300,24 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
   const [clienteIe, setClienteIe] = useState(ed.clienteIe||"");
   const [formaPgto, setFormaPgto] = useState(ed.formaPgto||"pix");
   const [mostrarFiscal, setMostrarFiscal] = useState(false);
+  const [buscandoCepForm, setBuscandoCepForm] = useState(false);
+
+  const buscarCepForm = async (cepRaw) => {
+    const cep = cepRaw.replace(/\D/g,'');
+    if(cep.length !== 8) return;
+    setBuscandoCepForm(true);
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const d = await r.json();
+      if(!d.erro) {
+        setClienteLogradouro(d.logradouro||"");
+        setClienteBairro(d.bairro||"");
+        setClienteCidade(d.localidade||"");
+        setClienteUf(d.uf||"");
+      }
+    } catch(e) { console.error("CEP não encontrado"); }
+    setBuscandoCepForm(false);
+  };
   const [txtWhatsForm, setTxtWhatsForm] = useState("");
   const [extraindoForm, setExtraindoForm] = useState(false);
 
@@ -503,7 +521,14 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
               </div>
               <Campo label="Email" value={clienteEmail} onChange={setClienteEmail} placeholder="email@cliente.com" type="email"/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <Campo label="CEP" value={clienteCep} onChange={setClienteCep} placeholder="00000-000"/>
+                <div style={{marginBottom:13}}>
+              <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>CEP</div>
+              <div style={{display:"flex",gap:8}}>
+                <input value={clienteCep||""} onChange={e=>{setClienteCep(e.target.value);buscarCepForm(e.target.value);}} placeholder="00000-000"
+                  style={{flex:1,background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
+                {buscandoCepForm&&<div style={{display:"flex",alignItems:"center",color:S.verde,fontSize:13,whiteSpace:"nowrap"}}>⏳ Buscando...</div>}
+              </div>
+            </div>
                 <Campo label="Número" value={clienteNumero} onChange={setClienteNumero} placeholder="123"/>
               </div>
               <Campo label="Logradouro" value={clienteLogradouro} onChange={setClienteLogradouro} placeholder="Rua, Av..."/>
@@ -556,6 +581,24 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
   const [fIe, setFIe] = useState(pedido.clienteIe||"");
   const [fPgto, setFPgto] = useState(pedido.formaPgto||"pix");
   const [salvandoFiscal, setSalvandoFiscal] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
+
+  const buscarCep = async (cepRaw) => {
+    const cep = cepRaw.replace(/\D/g,'');
+    if(cep.length !== 8) return;
+    setBuscandoCep(true);
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const d = await r.json();
+      if(!d.erro) {
+        setFLogradouro(d.logradouro||"");
+        setFBairro(d.bairro||"");
+        setFCidade(d.localidade||"");
+        setFUf(d.uf||"");
+      }
+    } catch(e) { console.error("CEP não encontrado"); }
+    setBuscandoCep(false);
+  };
   const [txtWhats, setTxtWhats] = useState("");
   const [extraindo, setExtraindo] = useState(false);
 
@@ -917,7 +960,14 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
               </div>
               <Campo label="Email" value={fEmail} onChange={setFEmail} placeholder="email@cliente.com" type="email"/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <Campo label="CEP" value={fCep} onChange={setFCep} placeholder="00000-000"/>
+                <div style={{marginBottom:13}}>
+                <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>CEP</div>
+                <div style={{display:"flex",gap:8}}>
+                  <input value={fCep||""} onChange={e=>{setFCep(e.target.value);buscarCep(e.target.value);}} placeholder="00000-000"
+                    style={{flex:1,background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
+                  {buscandoCep&&<div style={{display:"flex",alignItems:"center",color:S.verde,fontSize:13,whiteSpace:"nowrap"}}>⏳ Buscando...</div>}
+                </div>
+              </div>
                 <Campo label="Número" value={fNumero} onChange={setFNumero} placeholder="123"/>
               </div>
               <Campo label="Logradouro" value={fLogradouro} onChange={setFLogradouro} placeholder="Rua, Av..."/>
@@ -1387,7 +1437,20 @@ function NfeAvulsa() {
         </div>
         <Campo label="Email" value={email} onChange={setEmail} placeholder="email@cliente.com" type="email"/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <Campo label="CEP" value={cep} onChange={setCep} placeholder="00000-000"/>
+          <div style={{marginBottom:13}}>
+        <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>CEP</div>
+        <div style={{display:"flex",gap:8}}>
+          <input value={cep||""} onChange={async e=>{
+            setCep(e.target.value);
+            const c = e.target.value.replace(/\D/g,'');
+            if(c.length===8){
+              try{const r=await fetch(`https://viacep.com.br/ws/${c}/json/`);const d=await r.json();
+              if(!d.erro){setLogradouro(d.logradouro||"");setBairro(d.bairro||"");setCidade(d.localidade||"");setUf(d.uf||"");}}catch(e){}
+            }
+          }} placeholder="00000-000"
+            style={{flex:1,background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
+        </div>
+      </div>
           <Campo label="Número" value={numero} onChange={setNumero} placeholder="123"/>
         </div>
         <Campo label="Logradouro" value={logradouro} onChange={setLogradouro} placeholder="Rua, Av..."/>
