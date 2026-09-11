@@ -5,7 +5,11 @@ const USUARIOS = {
   yasmin: { senha: "yasmin123", nome: "Yasmin", role: "vendedora" },
 };
 
-const PRECOS_KIT = { 1: 1350, 2: 1850, 3: 2350, 4: 2650, 5: 2950, 6: 3250 };
+// ── tam:7 = Automação Avulso (R$800) ─────────────────────────────────────────
+const PRECOS_KIT = { 1: 1350, 2: 1850, 3: 2350, 4: 2650, 5: 2950, 6: 3250, 7: 800 };
+
+const KIT_LABEL = (n) => n === 7 ? "Automação Avulso" : `Kit ${n} baldinhos`;
+const KIT_LABEL_SEL = (n) => n === 7 ? `Automação Avulso — R$ 800,00` : `Kit ${n} — ${fmt(PRECOS_KIT[n])}`;
 
 const STATUS_FIN = {
   pendente: { label: "Pendente", cor: "#EF4444" },
@@ -118,7 +122,6 @@ const salvarPedido = async (p) => {
     nfe_ref: p.nfeRef||null,
     frete_pago: p.fretePago||false,
   };
-  // PATCH para atualizar, com log detalhado para debug
   const patchResp = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${p.id}`, {
     method: "PATCH",
     headers: {
@@ -131,7 +134,6 @@ const salvarPedido = async (p) => {
   });
   const patchTxt = await patchResp.text();
   const patchData = patchTxt ? JSON.parse(patchTxt) : [];
-  // Se PATCH não atualizou nenhum registro (array vazio), faz INSERT
   if (!patchResp.ok || (Array.isArray(patchData) && patchData.length === 0)) {
     const postResp = await fetch(`${SUPABASE_URL}/rest/v1/pedidos`, {
       method: "POST",
@@ -151,9 +153,7 @@ const salvarPedido = async (p) => {
 };
 
 const salvarDados = async (pedidos) => {
-  // Salva localStorage imediatamente como backup
   localStorage.setItem("pedidos_ms", JSON.stringify(pedidos));
-  // Salva sequencialmente para evitar rate limit do Supabase
   for (const p of pedidos) {
     try {
       await salvarPedido(p);
@@ -289,7 +289,6 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
   const [desc, setDesc] = useState(ed.desconto||0);
   const [obs, setObs] = useState(ed.obs||"");
   const [entradaValor, setEntradaValor] = useState("");
-  // Campos fiscais
   const [clienteRazao, setClienteRazao] = useState(ed.clienteRazao||"");
   const [clienteCnpj, setClienteCnpj] = useState(ed.clienteCnpj||"");
   const [clienteEmail, setClienteEmail] = useState(ed.clienteEmail||"");
@@ -320,6 +319,7 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
     } catch(e) { console.error("CEP não encontrado"); }
     setBuscandoCepForm(false);
   };
+
   const [txtWhatsForm, setTxtWhatsForm] = useState("");
   const [extraindoForm, setExtraindoForm] = useState(false);
 
@@ -351,6 +351,7 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
     }
     setExtraindoForm(false);
   };
+
   const [comprovante, setComprovante] = useState(null);
   const [analisando, setAnalisando] = useState(false);
 
@@ -407,13 +408,11 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
 
   return (
     <div style={{background:S.bg,minHeight:"100vh",display:"flex",flexDirection:"column"}}>
-      {/* Header */}
       <div style={{background:S.card,padding:"14px 18px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:10}}>
         <button onClick={onCancelar} style={{background:"none",border:"none",color:S.sub,fontSize:22,cursor:"pointer",padding:4}}>←</button>
         <div style={{fontSize:17,fontWeight:700,color:S.txt}}>{ed.id?"Editar Pedido":"Novo Pedido"}</div>
       </div>
 
-      {/* Conteúdo rolável */}
       <div style={{flex:1,overflowY:"auto",padding:16,paddingBottom:100}}>
         <Card>
           <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Cliente</div>
@@ -430,14 +429,15 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
           {kits.map((k,i)=>(
             <div key={i} style={{background:S.card2,borderRadius:12,padding:14,marginBottom:10,border:"1px solid "+S.borda}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 80px",gap:8,marginBottom:8}}>
+                {/* ── SELECT DE KIT: agora inclui tam:7 = Automação Avulso ── */}
                 <Sel label="Kit" value={k.tam} onChange={v=>updKit(i,"tam",v)}
-                  opts={[1,2,3,4,5,6].map(n=>({v:n,l:`Kit ${n} — ${fmt(PRECOS_KIT[n])}`}))}/>
+                  opts={[1,2,3,4,5,6,7].map(n=>({v:n,l:KIT_LABEL_SEL(n)}))}/>
                 <Sel label="Voltagem" value={k.volt} onChange={v=>updKit(i,"volt",v)}
                   opts={[{v:"220v",l:"220v"},{v:"110v",l:"110v"}]}/>
                 <Campo label="Qtd" value={k.qtd} onChange={v=>updKit(i,"qtd",v)} type="number"/>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:13,color:S.sub}}>Subtotal: <b style={{color:S.verde}}>{fmt(PRECOS_KIT[k.tam]*k.qtd)}</b></span>
+                <span style={{fontSize:13,color:S.sub}}>Subtotal: <b style={{color:S.verde}}>{fmt((PRECOS_KIT[k.tam]||0)*k.qtd)}</b></span>
                 {kits.length>1&&<button onClick={()=>remKit(i)} style={{background:"#EF444422",border:"none",color:"#EF4444",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:13}}>✕ Remover</button>}
               </div>
             </div>
@@ -501,7 +501,6 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
           </div>
           {mostrarFiscal&&(
             <>
-              {/* ── COLAR DO WHATSAPP ── */}
               <div style={{background:"#00C89611",border:"2px dashed "+S.verde,borderRadius:12,padding:14,marginBottom:14}}>
                 <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>📋 Colar dados do WhatsApp</div>
                 <textarea
@@ -524,13 +523,13 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
               <Campo label="Email" value={clienteEmail} onChange={setClienteEmail} placeholder="email@cliente.com" type="email"/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <div style={{marginBottom:13}}>
-              <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>CEP</div>
-              <div style={{display:"flex",gap:8}}>
-                <input value={clienteCep||""} onChange={e=>{setClienteCep(e.target.value);buscarCepForm(e.target.value);}} placeholder="00000-000"
-                  style={{flex:1,background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
-                {buscandoCepForm&&<div style={{display:"flex",alignItems:"center",color:S.verde,fontSize:13,whiteSpace:"nowrap"}}>⏳ Buscando...</div>}
-              </div>
-            </div>
+                  <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>CEP</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <input value={clienteCep||""} onChange={e=>{setClienteCep(e.target.value);buscarCepForm(e.target.value);}} placeholder="00000-000"
+                      style={{flex:1,background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
+                    {buscandoCepForm&&<div style={{display:"flex",alignItems:"center",color:S.verde,fontSize:13,whiteSpace:"nowrap"}}>⏳ Buscando...</div>}
+                  </div>
+                </div>
                 <Campo label="Número" value={clienteNumero} onChange={setClienteNumero} placeholder="123"/>
               </div>
               <Campo label="Logradouro" value={clienteLogradouro} onChange={setClienteLogradouro} placeholder="Rua, Av..."/>
@@ -546,7 +545,6 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
         </Card>
       </div>
 
-      {/* Botões fixos no fundo */}
       <div style={{position:"fixed",bottom:0,left:0,right:0,background:S.card,borderTop:"1px solid "+S.borda,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,zIndex:100}}>
         <Btn onClick={onCancelar} v="secondary" full>Cancelar</Btn>
         <Btn onClick={salvar} v="primary" full>✓ Salvar Pedido</Btn>
@@ -568,8 +566,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
   const [analisandoFrete, setAnalisandoFrete] = useState(false);
   const [textoRastreio, setTextoRastreio] = useState("");
   const [copiado, setCopiado] = useState(false);
-
-  // ── ESTADOS NOVOS: edição de dados fiscais ──────────────────────────────
   const [editFiscal, setEditFiscal] = useState(false);
   const [fRazao, setFRazao] = useState(pedido.clienteRazao||"");
   const [fCnpj, setFCnpj] = useState(pedido.clienteCnpj||"");
@@ -601,6 +597,7 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
     } catch(e) { console.error("CEP não encontrado"); }
     setBuscandoCep(false);
   };
+
   const [txtWhats, setTxtWhats] = useState("");
   const [extraindo, setExtraindo] = useState(false);
 
@@ -645,7 +642,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
     setSalvandoFiscal(false);
     setEditFiscal(false);
   };
-  // ────────────────────────────────────────────────────────────────────────────
 
   const totalPago = (pedido.entradas||[]).reduce((s,e)=>s+(e.valor||0),0);
   const saldo = pedido.totalFinal - totalPago;
@@ -670,9 +666,7 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
       });
       const parsed = await resp.json();
       if(parsed.valor) setNovaEnt(String(parsed.valor));
-    } catch(e) {
-      alert("Não consegui ler o valor. Digite manualmente.");
-    }
+    } catch(e) { alert("Não consegui ler o valor. Digite manualmente."); }
     setAnalisando(false);
   };
 
@@ -703,9 +697,7 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
         const txt2 = `CÓDIGO DE RASTREIO\n\n${parsed.rastreio||""}\n\nVALOR ENVIO ${fmt(parseFloat(comMargem))}`;
         setTextoRastreio(txt2);
       }
-    } catch(e) {
-      alert("Não consegui ler o comprovante. Preencha manualmente.");
-    }
+    } catch(e) { alert("Não consegui ler o comprovante. Preencha manualmente."); }
     setAnalisandoFrete(false);
   };
 
@@ -727,7 +719,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
     setTextoRastreio(txt);
   };
 
-  // Sincroniza estados fiscais quando pedido é atualizado externamente (ex: ao voltar ao pedido)
   useEffect(() => {
     setFRazao(pedido.clienteRazao||"");
     setFCnpj(pedido.clienteCnpj||"");
@@ -742,7 +733,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
     setFPgto(pedido.formaPgto||"pix");
   }, [pedido.id, pedido.clienteCnpj, pedido.clienteRazao]);
 
-  // Verifica se dados fiscais já estão preenchidos
   const temDadosFiscais = !!(pedido.clienteCnpj && pedido.clienteRazao);
 
   return (
@@ -758,19 +748,21 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
       </div>
 
       <div style={{padding:16}}>
-        {/* Kits */}
         <Card>
           <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Kits</div>
           {pedido.kits.map((k,i)=>(
             <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:i<pedido.kits.length-1?"1px solid "+S.borda:"none"}}>
-              <span style={{color:S.txt,fontWeight:600}}>Kit {k.tam} baldinhos <span style={{color:S.dim,fontWeight:400}}>· {k.volt} · x{k.qtd}</span></span>
-              <span style={{color:S.verde,fontWeight:700}}>{fmt(PRECOS_KIT[k.tam]*k.qtd)}</span>
+              {/* ── LABEL CORRETO: Automação Avulso para tam:7 ── */}
+              <span style={{color:S.txt,fontWeight:600}}>
+                {KIT_LABEL(k.tam)}
+                <span style={{color:S.dim,fontWeight:400}}> · {k.volt} · x{k.qtd}</span>
+              </span>
+              <span style={{color:S.verde,fontWeight:700}}>{fmt((PRECOS_KIT[k.tam]||0)*k.qtd)}</span>
             </div>
           ))}
           {pedido.obs&&<div style={{marginTop:14,background:"#F59E0B22",border:"2px solid #F59E0B",borderRadius:12,padding:"12px 14px",display:"flex",gap:10,alignItems:"flex-start"}}><span style={{fontSize:20}}>⚠️</span><div><div style={{fontSize:11,fontWeight:700,color:"#F59E0B",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Observações importantes</div><div style={{fontSize:14,color:S.txt,fontWeight:600,lineHeight:1.5}}>{pedido.obs}</div></div></div>}
         </Card>
 
-        {/* Financeiro */}
         <Card>
           <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Financeiro</div>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:14,color:S.sub}}><span>Subtotal</span><span>{fmt(pedido.subtotal)}</span></div>
@@ -806,13 +798,9 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
                 const f=e.target.files[0];
                 if(f){setComprovante(f);analisarComprovante(f);}
               }}/>
-              {analisando?(
-                <div style={{color:S.verde,fontSize:13}}>⏳ Lendo comprovante...</div>
-              ):comprovante?(
-                <div style={{color:S.verde,fontSize:13}}>✅ {comprovante.name}<br/><span style={{color:S.dim,fontSize:11}}>Toque para trocar</span></div>
-              ):(
-                <div style={{color:S.verde,fontSize:13}}>📷 Subir comprovante de pagamento<br/><span style={{color:S.dim,fontSize:11}}>A IA lê o valor automaticamente</span></div>
-              )}
+              {analisando?(<div style={{color:S.verde,fontSize:13}}>⏳ Lendo comprovante...</div>
+              ):comprovante?(<div style={{color:S.verde,fontSize:13}}>✅ {comprovante.name}<br/><span style={{color:S.dim,fontSize:11}}>Toque para trocar</span></div>
+              ):(<div style={{color:S.verde,fontSize:13}}>📷 Subir comprovante de pagamento<br/><span style={{color:S.dim,fontSize:11}}>A IA lê o valor automaticamente</span></div>)}
             </label>
             <div style={{display:"flex",gap:10,marginBottom:10}}>
               <input value={novaEnt} onChange={e=>setNovaEnt(e.target.value)} type="number" placeholder="Valor recebido (R$)"
@@ -827,7 +815,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
           </div>
         </Card>
 
-        {/* Envio */}
         <Card>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
             <div style={{fontSize:12,fontWeight:700,color:S.verde,textTransform:"uppercase",letterSpacing:1}}>Envio</div>
@@ -844,13 +831,9 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
                     const f=e.target.files[0];
                     if(f){setCompFrete(f);analisarCompFrete(f);}
                   }}/>
-                  {analisandoFrete?(
-                    <div style={{color:S.verde,fontSize:13}}>⏳ Lendo código e valor...</div>
-                  ):compFrete?(
-                    <div style={{color:S.verde,fontSize:13}}>✅ {compFrete.name}<br/><span style={{color:S.dim,fontSize:11}}>Rastreio e valor preenchidos automaticamente</span></div>
-                  ):(
-                    <div style={{color:S.verde,fontSize:13}}>📷 Subir comprovante dos Correios<br/><span style={{color:S.dim,fontSize:11}}>A IA lê código e valor (+25% automático)</span></div>
-                  )}
+                  {analisandoFrete?(<div style={{color:S.verde,fontSize:13}}>⏳ Lendo código e valor...</div>
+                  ):compFrete?(<div style={{color:S.verde,fontSize:13}}>✅ {compFrete.name}<br/><span style={{color:S.dim,fontSize:11}}>Rastreio e valor preenchidos automaticamente</span></div>
+                  ):(<div style={{color:S.verde,fontSize:13}}>📷 Subir comprovante dos Correios<br/><span style={{color:S.dim,fontSize:11}}>A IA lê código e valor (+25% automático)</span></div>)}
                 </label>
               </div>
               <Campo label="Código de rastreio" value={rastreio} onChange={setRastreio} placeholder="AA123456789BR"/>
@@ -867,7 +850,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
           )}
         </Card>
 
-        {/* Texto de rastreio para cliente */}
         {(textoRastreio||(pedido.rastreio&&pedido.frete>0))&&(
           <Card>
             <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>📤 Mensagem para o cliente</div>
@@ -887,7 +869,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
           </Card>
         )}
 
-        {/* ── CARD: Pagamento do Frete ─────────────────────────────────────────── */}
         {(pedido.statusEnvio==="enviado"||pedido.statusEnvio==="entregue")&&(pedido.frete||0)>0&&(
           <Card style={{border:"2px solid "+(pedido.fretePago?"#10B981":"#F59E0B")}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -913,12 +894,10 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
           </Card>
         )}
 
-        {/* ── CARD NOVO: Dados Fiscais editáveis ────────────────────────────── */}
         <Card>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editFiscal?16:0}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{fontSize:12,fontWeight:700,color:S.verde,textTransform:"uppercase",letterSpacing:1}}>🧾 Dados Fiscais (NF-e)</div>
-              {/* Indicador visual: preenchido ou vazio */}
               {!editFiscal && (
                 <span style={{
                   background: temDadosFiscais ? "#10B98122" : "#EF444422",
@@ -934,7 +913,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
             </Btn>
           </div>
 
-          {/* Modo visualização */}
           {!editFiscal && temDadosFiscais && (
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {[
@@ -955,7 +933,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
             </div>
           )}
 
-          {/* Modo vazio + não editando */}
           {!editFiscal && !temDadosFiscais && (
             <div style={{background:"#EF444411",border:"1px dashed #EF4444",borderRadius:10,padding:14,textAlign:"center",marginTop:8}}>
               <div style={{fontSize:13,color:"#EF4444",fontWeight:600,marginBottom:4}}>Dados fiscais não preenchidos</div>
@@ -963,10 +940,8 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
             </div>
           )}
 
-          {/* Modo edição */}
           {editFiscal && (
             <>
-              {/* ── COLAR DO WHATSAPP ── */}
               <div style={{background:"#00C89611",border:"2px dashed "+S.verde,borderRadius:12,padding:14,marginBottom:14}}>
                 <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>📋 Colar dados do WhatsApp</div>
                 <textarea
@@ -989,13 +964,13 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
               <Campo label="Email" value={fEmail} onChange={setFEmail} placeholder="email@cliente.com" type="email"/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <div style={{marginBottom:13}}>
-                <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>CEP</div>
-                <div style={{display:"flex",gap:8}}>
-                  <input value={fCep||""} onChange={e=>{setFCep(e.target.value);buscarCep(e.target.value);}} placeholder="00000-000"
-                    style={{flex:1,background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
-                  {buscandoCep&&<div style={{display:"flex",alignItems:"center",color:S.verde,fontSize:13,whiteSpace:"nowrap"}}>⏳ Buscando...</div>}
+                  <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>CEP</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <input value={fCep||""} onChange={e=>{setFCep(e.target.value);buscarCep(e.target.value);}} placeholder="00000-000"
+                      style={{flex:1,background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
+                    {buscandoCep&&<div style={{display:"flex",alignItems:"center",color:S.verde,fontSize:13,whiteSpace:"nowrap"}}>⏳ Buscando...</div>}
+                  </div>
                 </div>
-              </div>
                 <Campo label="Número" value={fNumero} onChange={setFNumero} placeholder="123"/>
               </div>
               <Campo label="Logradouro" value={fLogradouro} onChange={setFLogradouro} placeholder="Rua, Av..."/>
@@ -1012,8 +987,6 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
             </>
           )}
         </Card>
-        {/* ────────────────────────────────────────────────────────────────── */}
-
       </div>
       <NfeEmissor pedido={pedido} onAtualizar={onAtualizar}/>
     </div>
@@ -1073,12 +1046,13 @@ function NfeEmissor({pedido, onAtualizar}) {
       if(resp.status===200||resp.status===201||resp.status===202) {
         setStatusNfe(data.status||"emitida");
         if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
-        // Salva o ref único para consulta posterior
         if(data.ref) setNfeRef(data.ref);
         onAtualizar({...pedido,statusNfe:data.status,linkNfe:data.caminho_danfe||"",nfeRef:data.ref||pedido.nfeRef||""});
-        const msgStatus = data.status === "processando_autorizacao" ? "✅ NF-e enviada à SEFAZ!\n\nAguarde alguns segundos e clique em 🔄 para consultar o status." : "✅ NF-e enviada! Status: "+(data.status||"processando"); alert(msgStatus);
+        const msgStatus = data.status === "processando_autorizacao" ? "✅ NF-e enviada à SEFAZ!\n\nAguarde alguns segundos e clique em 🔄 para consultar o status." : "✅ NF-e enviada! Status: "+(data.status||"processando");
+        alert(msgStatus);
       } else {
-        const detErros = data.erros && data.erros.length > 0 ? "\n\nDetalhes:\n" + data.erros.map(e => "• " + (e.codigo||"") + ": " + (e.mensagem||JSON.stringify(e))).join("\n") : ""; alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data))+detErros);
+        const detErros = data.erros && data.erros.length > 0 ? "\n\nDetalhes:\n" + data.erros.map(e => "• " + (e.codigo||"") + ": " + (e.mensagem||JSON.stringify(e))).join("\n") : "";
+        alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data))+detErros);
       }
     } catch(e){ alert("Erro: "+e.message); }
     setEmitindo(false);
@@ -1118,7 +1092,6 @@ function NfeEmissor({pedido, onAtualizar}) {
             padding:"12px 16px",fontWeight:600,fontSize:13,cursor:"pointer"
           }}>🔄</button>}
         </div>
-        
       </div>
     </div>
   );
@@ -1129,7 +1102,6 @@ function ListaPedidos({pedidos, usuario, onSelecionar}) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("producao");
 
-  // Todos os usuários veem todos os pedidos; só o dashboard é restrito ao admin
   const base = pedidos
     .filter(p=> p.cliente.toLowerCase().includes(busca.toLowerCase())||p.telefone.includes(busca));
 
@@ -1205,8 +1177,9 @@ function ListaPedidos({pedidos, usuario, onSelecionar}) {
                   <Badge label={STATUS_FIN[sf2].label} cor={STATUS_FIN[sf2].cor}/>
                 )}
               </div>
+              {/* ── LABEL CORRETO NA LISTA: Automação Avulso para tam:7 ── */}
               <div style={{fontSize:13,color:S.sub,marginBottom:8}}>
-                {p.kits.map(k=>`Kit ${k.tam} (${k.volt})`).join(", ")}
+                {p.kits.map(k=>k.tam===7?"Automação Avulso":`Kit ${k.tam} (${k.volt})`).join(", ")}
               </div>
               {pgtoFaltando && (
                 <div style={{background:"#EF444422",borderRadius:8,padding:"6px 10px",marginBottom:8,fontSize:12,color:"#EF4444",fontWeight:600}}>
@@ -1241,8 +1214,9 @@ function Dashboard({pedidos, usuario}) {
   const [dataFim, setDataFim] = useState("");
   const agora = new Date();
 
+  // ── FILTRO POR data_pedido (corrigido — antes usava criadoEm) ────────────
   const filtrar = (p) => {
-    const d = new Date(p.criadoEm);
+    const d = new Date((p.dataPedido||p.criadoEm)+"T00:00:00");
     if(periodo==="personalizado") {
       const ini = dataInicio ? new Date(dataInicio+"T00:00:00") : null;
       const fim = dataFim   ? new Date(dataFim+"T23:59:59")    : null;
@@ -1264,9 +1238,11 @@ function Dashboard({pedidos, usuario}) {
   const agEnvio = lista.filter(p=>(p.statusEnvio||"aguardando")==="aguardando").length;
   const agPgto = lista.filter(p=>sfin(p)==="parcial").length;
 
-  const porKit = [1,2,3,4,5,6].map(n=>({
-    n, qtd: lista.reduce((s,p)=>s+p.kits.filter(k=>k.tam===n).reduce((ss,k)=>ss+k.qtd,0),0),
-    fat: lista.reduce((s,p)=>s+p.kits.filter(k=>k.tam===n).reduce((ss,k)=>ss+PRECOS_KIT[n]*k.qtd,0),0),
+  // ── POR KIT: agora inclui tam:7 (Automação Avulso) ───────────────────────
+  const porKit = [1,2,3,4,5,6,7].map(n=>({
+    n,
+    qtd: lista.reduce((s,p)=>s+p.kits.filter(k=>k.tam===n).reduce((ss,k)=>ss+k.qtd,0),0),
+    fat: lista.reduce((s,p)=>s+p.kits.filter(k=>k.tam===n).reduce((ss,k)=>ss+(PRECOS_KIT[n]||0)*k.qtd,0),0),
   })).filter(k=>k.qtd>0);
 
   const porVendedor = usuario.role==="admin"
@@ -1373,7 +1349,8 @@ function Dashboard({pedidos, usuario}) {
         {porKit.map((k,i)=>(
           <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:i<porKit.length-1?"1px solid "+S.borda:"none"}}>
             <div>
-              <div style={{fontSize:14,fontWeight:600,color:S.txt}}>Kit {k.n} baldinhos</div>
+              {/* ── LABEL CORRETO NO RELATÓRIO ── */}
+              <div style={{fontSize:14,fontWeight:600,color:S.txt}}>{KIT_LABEL(k.n)}</div>
               <div style={{fontSize:12,color:S.dim}}>{k.qtd} unidades</div>
             </div>
             <div style={{fontSize:15,fontWeight:700,color:S.verde}}>{fmt(k.fat)}</div>
@@ -1384,7 +1361,6 @@ function Dashboard({pedidos, usuario}) {
     </div>
   );
 }
-
 
 // ── NF-e AVULSA ──────────────────────────────────────────────────────────────
 function NfeAvulsa() {
@@ -1483,7 +1459,6 @@ function NfeAvulsa() {
     <div style={{padding:16,paddingBottom:100}}>
       <div style={{fontSize:16,fontWeight:800,color:S.verde,marginBottom:16,textTransform:"uppercase",letterSpacing:1}}>🧾 Emissão Avulsa de NF-e</div>
 
-      {/* Colar do WhatsApp */}
       <Card>
         <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>📋 Colar dados do WhatsApp</div>
         <textarea value={txtWhats} onChange={e=>setTxtWhats(e.target.value)}
@@ -1494,7 +1469,6 @@ function NfeAvulsa() {
         </Btn>
       </Card>
 
-      {/* Dados do destinatário */}
       <Card>
         <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Destinatário</div>
         <Campo label="Razão Social / Nome completo" value={razao} onChange={setRazao} placeholder="Nome ou Razão Social"/>
@@ -1505,19 +1479,19 @@ function NfeAvulsa() {
         <Campo label="Email" value={email} onChange={setEmail} placeholder="email@cliente.com" type="email"/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div style={{marginBottom:13}}>
-        <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>CEP</div>
-        <div style={{display:"flex",gap:8}}>
-          <input value={cep||""} onChange={async e=>{
-            setCep(e.target.value);
-            const c = e.target.value.replace(/\D/g,'');
-            if(c.length===8){
-              try{const r=await fetch(`https://viacep.com.br/ws/${c}/json/`);const d=await r.json();
-              if(!d.erro){setLogradouro(d.logradouro||"");setBairro(d.bairro||"");setCidade(d.localidade||"");setUf(d.uf||"");}}catch(e){}
-            }
-          }} placeholder="00000-000"
-            style={{flex:1,background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
-        </div>
-      </div>
+            <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>CEP</div>
+            <div style={{display:"flex",gap:8}}>
+              <input value={cep||""} onChange={async e=>{
+                setCep(e.target.value);
+                const c = e.target.value.replace(/\D/g,'');
+                if(c.length===8){
+                  try{const r=await fetch(`https://viacep.com.br/ws/${c}/json/`);const d=await r.json();
+                  if(!d.erro){setLogradouro(d.logradouro||"");setBairro(d.bairro||"");setCidade(d.localidade||"");setUf(d.uf||"");}}catch(e){}
+                }
+              }} placeholder="00000-000"
+                style={{flex:1,background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,outline:"none"}}/>
+            </div>
+          </div>
           <Campo label="Número" value={numero} onChange={setNumero} placeholder="123"/>
         </div>
         <Campo label="Logradouro" value={logradouro} onChange={setLogradouro} placeholder="Rua, Av..."/>
@@ -1528,7 +1502,6 @@ function NfeAvulsa() {
         </div>
       </Card>
 
-      {/* Valor e descrição */}
       <Card>
         <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Nota Fiscal</div>
         <Campo label="Valor (R$)" value={valor} onChange={setValor} type="number" placeholder="0,00"/>
@@ -1537,7 +1510,6 @@ function NfeAvulsa() {
           opts={[{v:"pix",l:"PIX"},{v:"cartao",l:"Cartão"},{v:"boleto",l:"Boleto"}]}/>
       </Card>
 
-      {/* Status */}
       {statusNfe&&(
         <Card>
           <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Status</div>
@@ -1546,7 +1518,6 @@ function NfeAvulsa() {
         </Card>
       )}
 
-      {/* Botão emitir */}
       <Btn onClick={emitir} v="primary" sz="lg" full disabled={emitindo}>
         {emitindo?"⏳ Emitindo...":"🧾 Emitir NF-e"}
       </Btn>
@@ -1562,7 +1533,6 @@ export default function App() {
   const [subTela, setSubTela] = useState(null);
   const [pedSel, setPedSel] = useState(null);
   const [loading, setLoading] = useState(true);
-  // pedSelRef garante que o pedido selecionado não some durante re-renders assíncronos
   const pedSelRef = useRef(null);
 
   useEffect(()=>{ carregarDados().then(p=>{setPedidos(p);setLoading(false);}); },[]);
@@ -1571,14 +1541,11 @@ export default function App() {
 
   const onSalvarPedido = async (p) => {
     const lista = pedidos.find(x=>x.id===p.id) ? pedidos.map(x=>x.id===p.id?p:x) : [p,...pedidos];
-    // Atualiza estado e localStorage imediatamente
     setPedidos(lista);
     localStorage.setItem("pedidos_ms", JSON.stringify(lista));
-    // Navega de volta imediatamente
     setSubTela(null);
     setPedSel(null);
     pedSelRef.current = null;
-    // Salva no Supabase em background com retry
     let tentativas = 0;
     while (tentativas < 3) {
       try {
@@ -1612,16 +1579,13 @@ export default function App() {
   };
 
   const onAtualizar = async (p) => {
-    // 1. Atualiza navegação imediatamente
     pedSelRef.current = p;
     setPedSel(p);
-    // 2. Atualiza lista em memória
     setPedidos(prev => {
       const lista = prev.map(x => x.id===p.id ? p : x);
       localStorage.setItem("pedidos_ms", JSON.stringify(lista));
       return lista;
     });
-    // 3. Persiste no Supabase com retry e alerta visível em caso de falha
     let tentativas = 0;
     let salvoOk = false;
     while (tentativas < 3) {
@@ -1642,7 +1606,6 @@ export default function App() {
 
   if(!usuario) return <Login onLogin={setUsuario}/>;
 
-  // Usa pedSelRef.current como fallback para evitar que a tela feche durante saves assíncronos
   const pedidoAtivo = pedSel || pedSelRef.current;
 
   if(subTela==="novo") return <FormPedido usuario={usuario} onSalvar={onSalvarPedido} onCancelar={()=>setSubTela(null)}/>;
@@ -1651,13 +1614,12 @@ export default function App() {
 
   return (
     <div style={{background:S.bg,minHeight:"100vh",maxWidth:600,margin:"0 auto",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
-      {/* Header */}
       <div style={{background:S.card,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:50,borderBottom:"1px solid "+S.borda}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:26}}>🪣</span>
           <div>
             <div style={{fontSize:15,fontWeight:800,color:S.verde,letterSpacing:-0.5}}>MACHADO SISTEMAS</div>
-          <div style={{fontSize:9,color:S.dim,letterSpacing:0}}>v2.1</div>
+            <div style={{fontSize:9,color:S.dim,letterSpacing:0}}>v2.2</div>
             <div style={{fontSize:11,color:S.dim}}>Olá, {usuario.nome}! 👋</div>
           </div>
         </div>
@@ -1667,7 +1629,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Conteúdo */}
       <div style={{paddingBottom:80}}>
         {loading ? (
           <div style={{textAlign:"center",padding:60,color:S.dim}}>
@@ -1683,7 +1644,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Nav */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:600,background:S.card,borderTop:"1px solid "+S.borda,display:"flex",zIndex:50}}>
         {[
           {id:"pedidos",icon:"📦",l:"Pedidos"},
