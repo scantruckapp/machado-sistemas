@@ -1209,10 +1209,19 @@ function ListaPedidos({pedidos, usuario, onSelecionar}) {
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard({pedidos, usuario}) {
   const [periodo, setPeriodo] = useState("mes");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
   const agora = new Date();
 
   const filtrar = (p) => {
     const d = new Date(p.criadoEm);
+    if(periodo==="personalizado") {
+      const ini = dataInicio ? new Date(dataInicio+"T00:00:00") : null;
+      const fim = dataFim   ? new Date(dataFim+"T23:59:59")    : null;
+      if(ini && d < ini) return false;
+      if(fim && d > fim) return false;
+      return true;
+    }
     if(periodo==="mes") return d.getMonth()===agora.getMonth()&&d.getFullYear()===agora.getFullYear();
     if(periodo==="ano") return d.getFullYear()===agora.getFullYear();
     return true;
@@ -1242,14 +1251,28 @@ function Dashboard({pedidos, usuario}) {
 
   return (
     <div style={{padding:16}}>
-      <div style={{display:"flex",gap:8,marginBottom:18}}>
-        {[{v:"mes",l:"Este mês"},{v:"ano",l:"Este ano"},{v:"tudo",l:"Tudo"}].map(f=>(
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+        {[{v:"mes",l:"Este mês"},{v:"ano",l:"Este ano"},{v:"tudo",l:"Tudo"},{v:"personalizado",l:"📅 Período"}].map(f=>(
           <button key={f.v} onClick={()=>setPeriodo(f.v)} style={{
             background:periodo===f.v?S.verde:S.card,color:periodo===f.v?"#0D1117":S.sub,
             border:"none",borderRadius:20,padding:"8px 18px",fontSize:13,fontWeight:700,cursor:"pointer",
           }}>{f.l}</button>
         ))}
       </div>
+      {periodo==="personalizado"&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+          <div>
+            <div style={{fontSize:11,color:S.dim,marginBottom:4,fontWeight:600,textTransform:"uppercase"}}>De</div>
+            <input type="date" value={dataInicio} onChange={e=>setDataInicio(e.target.value)}
+              style={{width:"100%",background:S.card,border:"1px solid "+S.borda,borderRadius:10,padding:"10px 12px",color:S.txt,fontSize:14,boxSizing:"border-box"}}/>
+          </div>
+          <div>
+            <div style={{fontSize:11,color:S.dim,marginBottom:4,fontWeight:600,textTransform:"uppercase"}}>Até</div>
+            <input type="date" value={dataFim} onChange={e=>setDataFim(e.target.value)}
+              style={{width:"100%",background:S.card,border:"1px solid "+S.borda,borderRadius:10,padding:"10px 12px",color:S.txt,fontSize:14,boxSizing:"border-box"}}/>
+          </div>
+        </div>
+      )}
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
         {[
