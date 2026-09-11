@@ -74,6 +74,7 @@ const carregarDados = async () => {
       statusNfe: r.status_nfe,
       linkNfe: r.link_nfe,
       nfeRef: r.nfe_ref,
+      fretePago: r.frete_pago||false,
     }));
   } catch(e) {
     console.error("Erro ao carregar:", e);
@@ -115,6 +116,7 @@ const salvarPedido = async (p) => {
     status_nfe: p.statusNfe||null,
     link_nfe: p.linkNfe||null,
     nfe_ref: p.nfeRef||null,
+    frete_pago: p.fretePago||false,
   };
   // PATCH para atualizar, com log detalhado para debug
   const patchResp = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${p.id}`, {
@@ -885,6 +887,32 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
           </Card>
         )}
 
+        {/* ── CARD: Pagamento do Frete ─────────────────────────────────────────── */}
+        {(pedido.statusEnvio==="enviado"||pedido.statusEnvio==="entregue")&&(pedido.frete||0)>0&&(
+          <Card style={{border:"2px solid "+(pedido.fretePago?"#10B981":"#F59E0B")}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:pedido.fretePago?"#10B981":"#F59E0B",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>
+                  🚚 Pagamento do Frete
+                </div>
+                <div style={{fontSize:18,fontWeight:800,color:S.txt}}>{fmt(pedido.frete||0)}</div>
+                <div style={{fontSize:12,color:S.dim,marginTop:2}}>
+                  {pedido.fretePago ? "✅ Frete recebido" : "⏳ Aguardando pagamento do frete"}
+                </div>
+              </div>
+              <button onClick={()=>onAtualizar({...pedido, fretePago:!pedido.fretePago})}
+                style={{
+                  background:pedido.fretePago?"#10B98122":"#F59E0B22",
+                  color:pedido.fretePago?"#10B981":"#F59E0B",
+                  border:"2px solid "+(pedido.fretePago?"#10B981":"#F59E0B"),
+                  borderRadius:12,padding:"10px 16px",fontSize:13,fontWeight:700,cursor:"pointer",
+                }}>
+                {pedido.fretePago?"↩ Desfazer":"✓ Confirmar"}
+              </button>
+            </div>
+          </Card>
+        )}
+
         {/* ── CARD NOVO: Dados Fiscais editáveis ────────────────────────────── */}
         <Card>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editFiscal?16:0}}>
@@ -1305,6 +1333,22 @@ function Dashboard({pedidos, usuario}) {
             <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Descontos dados</div>
             <div style={{fontSize:22,fontWeight:800,color:"#EF4444"}}>{fmt(descTotal)}</div>
             <div style={{fontSize:13,color:S.dim,marginTop:4}}>{fat>0?((descTotal/(fat+descTotal))*100).toFixed(1):0}% do faturamento bruto</div>
+          </Card>
+
+          <Card>
+            <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>🚚 Fretes</div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:14}}>
+              <span style={{color:S.sub}}>Total cobrado</span>
+              <span style={{color:S.txt,fontWeight:700}}>{fmt(lista.reduce((s,p)=>s+(p.frete||0),0))}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:14}}>
+              <span style={{color:S.sub}}>Já recebido</span>
+              <span style={{color:"#10B981",fontWeight:700}}>{fmt(lista.filter(p=>p.fretePago).reduce((s,p)=>s+(p.frete||0),0))}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:14,borderTop:"1px solid "+S.borda,paddingTop:8}}>
+              <span style={{color:S.sub}}>A receber</span>
+              <span style={{color:"#F59E0B",fontWeight:700}}>{fmt(lista.filter(p=>!p.fretePago&&(p.statusEnvio==="enviado"||p.statusEnvio==="entregue")&&(p.frete||0)>0).reduce((s,p)=>s+(p.frete||0),0))}</span>
+            </div>
           </Card>
 
           <Card>
