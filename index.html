@@ -213,6 +213,7 @@ footer{position:relative;z-index:1;padding:40px 5vw;color:var(--sub);font-size:1
       </div>
     </div>
       
+      
       <div class="idiomas"><a href="index.html" class="idioma ativo" data-lang="pt" title="Português" aria-label="Português"><svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#009C3B"/><path d="M15 2 28 10 15 18 2 10z" fill="#FFDF00"/><circle cx="15" cy="10" r="4.6" fill="#002776"/></svg><span>PT</span></a><a href="index-en.html" class="idioma" data-lang="en" title="English" aria-label="English"><svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#B22234"/><rect y="1.54" width="30" height="1.54" fill="#fff"/><rect y="4.62" width="30" height="1.54" fill="#fff"/><rect y="7.69" width="30" height="1.54" fill="#fff"/><rect y="10.77" width="30" height="1.54" fill="#fff"/><rect y="13.85" width="30" height="1.54" fill="#fff"/><rect y="16.92" width="30" height="1.54" fill="#fff"/><rect width="13" height="10.77" fill="#3C3B6E"/></svg><span>EN</span></a><a href="index-es.html" class="idioma" data-lang="es" title="Español" aria-label="Español"><svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#AA151B"/><rect y="5" width="30" height="10" fill="#F1BF00"/></svg><span>ES</span></a></div>
   </nav>
 </header>
@@ -363,8 +364,8 @@ document.getElementById('listaKits').innerHTML=KITS.map((n,i)=>`
   </div>`).join('');
 
 // ---- parceiros ----
-const LOGOS=['the-best-acai','frutos-de-goias','ice-blend','eskimo-anga','wow-acai','tio-wil','chiara','amarena','amandau','safari','acai-purissimo','berrys','gebon','universo-acai','acai-do-norte','andrads','mundo-da-ovelha','parauara','delicias-frut-biss','refugio','acai-da-barra'];
-const NOMES={'the-best-acai':'The Best Açaí','frutos-de-goias':'Frutos de Goiás Sorvetes','ice-blend':'Ice Blend','eskimo-anga':'Eskimó Angá','wow-acai':'Wow Açaí','tio-wil':'Tio Wil Helados','chiara':'Chiara Gelateria','amarena':'Amarena Sorvetes','amandau':'Amandau','safari':'Safari Açaí & Sorvetes','acai-purissimo':'Açaí Puríssimo','berrys':"Berry's Iced Food",'gebon':'Gebon','universo-acai':'Universo Açaí Nordeste','acai-do-norte':'Açaí do Norte Distribuidora','andrads':"Sorvetes Andrad's",'mundo-da-ovelha':'O Mundo da Ovelha BÉÉ','parauara':'Parauara Açaí','delicias-frut-biss':'Delícias Frut Biss','refugio':'Refúgio Açaí','acai-da-barra':'Açaí da Barra'};
+const LOGOS=['the-best-acai','frutos-de-goias','ice-blend','eskimo-anga','wow-acai','tio-wil','chiara','amarena','amandau','safari','acai-purissimo','berrys','gebon','universo-acai','acai-do-norte','andrads','mundo-da-ovelha','parauara','delicias-frut-biss','refugio','acai-da-barra','thiago-pedebis','acai-zac','arq-acai'];
+const NOMES={'the-best-acai':'The Best Açaí','frutos-de-goias':'Frutos de Goiás Sorvetes','ice-blend':'Ice Blend','eskimo-anga':'Eskimó Angá','wow-acai':'Wow Açaí','tio-wil':'Tio Wil Helados','chiara':'Chiara Gelateria','amarena':'Amarena Sorvetes','amandau':'Amandau','safari':'Safari Açaí & Sorvetes','acai-purissimo':'Açaí Puríssimo','berrys':"Berry's Iced Food",'gebon':'Gebon','universo-acai':'Universo Açaí Nordeste','acai-do-norte':'Açaí do Norte Distribuidora','andrads':"Sorvetes Andrad's",'mundo-da-ovelha':'O Mundo da Ovelha BÉÉ','parauara':'Parauara Açaí','delicias-frut-biss':'Delícias Frut Biss','refugio':'Refúgio Açaí','acai-da-barra':'Açaí da Barra','thiago-pedebis':'Thiago Pedebis','acai-zac':'Açaí Zac','arq-acai':'Arq Açaí'};
 const tile=n=>`<div class="logo"><img src="img/logo-${n}.webp" alt="${NOMES[n]}" title="${NOMES[n]}"></div>`;
 const metade=Math.ceil(LOGOS.length/2), a=LOGOS.slice(0,metade), b=LOGOS.slice(metade).concat(LOGOS.slice(0,2));
 document.getElementById('trilho1').innerHTML=(a.concat(a,a)).map(tile).join('');
@@ -418,6 +419,7 @@ for(let i=0;i<45;i++)B.push({x:Math.random(),y:Math.random(),z:Math.random(),v:.
     cx.fillStyle=g;cx.beginPath();cx.arc(px,b.y*H,r,0,7);cx.fill()}
   requestAnimationFrame(anima)})();
 </script>
+
 
 <script>
 try{document.querySelectorAll('.idioma').forEach(a=>a.addEventListener('click',()=>localStorage.setItem('idioma',a.dataset.lang)));
