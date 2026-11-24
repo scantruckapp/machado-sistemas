@@ -43,11 +43,16 @@ section{position:relative;z-index:1;padding:110px 5vw}
 .tag{display:inline-block;background:rgba(63,208,255,.12);color:var(--ciano);border:1px solid rgba(63,208,255,.3);padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:.5px;margin-bottom:22px}
 h1{font-size:clamp(38px,5.6vw,72px);line-height:1.02;letter-spacing:-2px;font-weight:900}
 h1 em{font-style:normal;background:linear-gradient(90deg,var(--azul2),var(--ciano));-webkit-background-clip:text;background-clip:text;color:transparent}
-.hero p.lead{font-size:clamp(17px,1.6vw,20px);color:var(--sub);margin:24px 0 34px;max-width:560px}
+.hero p.lead{font-size:clamp(17px,1.6vw,20px);color:var(--sub);margin:24px 0 10px;max-width:560px}
 .acoes{display:flex;gap:14px;flex-wrap:wrap}
-.numeros{display:flex;gap:38px;margin-top:48px;flex-wrap:wrap}
+.numeros{display:flex;gap:30px;margin-top:34px;flex-wrap:wrap}
 .numeros b{display:block;font-size:34px;font-weight:900;letter-spacing:-1px}
 .numeros span{color:var(--sub);font-size:14px}
+.numeros{align-items:center}
+.destaque-lojas{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,rgba(31,107,255,.35),rgba(63,208,255,.15));border:1.5px solid rgba(63,208,255,.55);padding:16px 26px 16px 22px;border-radius:24px;box-shadow:0 0 40px rgba(63,208,255,.25);animation:brilha-l 3s ease-in-out infinite}
+.destaque-lojas b{font-size:clamp(46px,5vw,64px)!important;background:linear-gradient(90deg,#fff,var(--ciano));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1}
+.destaque-lojas span{text-align:left;color:#fff!important;font-size:17px!important;font-weight:700;line-height:1.25}
+@keyframes brilha-l{50%{box-shadow:0 0 70px rgba(63,208,255,.5)}}
 
 .palco{perspective:1200px;display:flex;justify-content:center;position:relative}
 .palco .disco{position:absolute;bottom:2%;width:78%;aspect-ratio:3/1;border-radius:50%;background:radial-gradient(closest-side,rgba(31,107,255,.55),transparent);filter:blur(8px);transform:rotateX(70deg)}
@@ -206,12 +211,10 @@ footer{position:relative;z-index:1;padding:40px 5vw;color:var(--sub);font-size:1
     <span class="tag">PATENTE PRÓPRIA · CUBAS 100% INOX</span>
     <h1>Boleador limpo o tempo todo, <em>sem trocar água na mão.</em></h1>
     <p class="lead">O baldinho automático da Machado Sistemas mantém a água corrente para lavar colheres e boleadores no balcão de açaí e sorvete. Mais higiene, menos desperdício e menos trabalho para a sua equipe.</p>
-    <div class="acoes">
-      <a class="btn zap" href="https://wa.me/5548999668902?text=Ol%C3%A1!%20Quero%20saber%20sobre%20os%20baldinhos%20autom%C3%A1ticos" target="_blank" rel="noopener">💬 Pedir orçamento</a>
-      <a class="btn sec" href="#como">Ver como funciona</a>
-    </div>
+    
     <div class="numeros">
-      <div><b data-conta="1000">0</b><span>lojas atendidas</span></div>
+      <div class="destaque-lojas"><b data-conta="1000">0</b><span>lojas já usam os<br>nossos baldinhos</span></div>
+      <div><b>4</b><span>países</span></div>
       <div><b>6</b><span>tamanhos de kit</span></div>
     </div>
   </div>
