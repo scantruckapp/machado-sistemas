@@ -33,6 +33,13 @@ nav a:not(.btn):hover{color:var(--branco)}
 .btn.zap{background:#25D366;box-shadow:0 8px 24px rgba(37,211,102,.35)}
 @media(max-width:820px){nav a:not(.btn):not(.menu-prod a){display:none}nav{gap:14px}}
 
+.idiomas{display:flex;gap:4px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);padding:4px;border-radius:999px}
+.idioma{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:13px;font-weight:800;color:var(--sub)!important;transition:background .2s}
+.idioma svg{width:22px;height:15px;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.idioma:hover{background:rgba(255,255,255,.1);color:#fff!important}
+.idioma.ativo{background:#fff;color:var(--navy)!important}
+@media(max-width:820px){nav a.idioma{display:flex!important}.idioma span{display:none}.idioma{padding:5px}.idioma svg{width:20px;height:14px}.idiomas{gap:2px;padding:3px}header{gap:6px}nav{gap:8px!important}}
+@media(max-width:420px){.marca img{height:24px!important}.mais>button{font-size:12px!important;padding:8px 10px!important;gap:4px!important}}
 /* ---------- fundo 3D ---------- */
 #bolhas{position:fixed;inset:0;z-index:0;pointer-events:none}
 section{position:relative;z-index:1;padding:110px 5vw}
@@ -202,6 +209,7 @@ footer{position:relative;z-index:1;padding:40px 5vw;color:var(--sub);font-size:1
         </a>
       </div>
     </div>
+      <div class="idiomas"><a href="index.html" class="idioma ativo" data-lang="pt" title="Português" aria-label="Português"><svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#009C3B"/><path d="M15 2 28 10 15 18 2 10z" fill="#FFDF00"/><circle cx="15" cy="10" r="4.6" fill="#002776"/></svg><span>PT</span></a><a href="index-en.html" class="idioma" data-lang="en" title="English" aria-label="English"><svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#B22234"/><rect y="1.54" width="30" height="1.54" fill="#fff"/><rect y="4.62" width="30" height="1.54" fill="#fff"/><rect y="7.69" width="30" height="1.54" fill="#fff"/><rect y="10.77" width="30" height="1.54" fill="#fff"/><rect y="13.85" width="30" height="1.54" fill="#fff"/><rect y="16.92" width="30" height="1.54" fill="#fff"/><rect width="13" height="10.77" fill="#3C3B6E"/></svg><span>EN</span></a><a href="index-es.html" class="idioma" data-lang="es" title="Español" aria-label="Español"><svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#AA151B"/><rect y="5" width="30" height="10" fill="#F1BF00"/></svg><span>ES</span></a></div>
   </nav>
 </header>
 
@@ -405,6 +413,12 @@ for(let i=0;i<45;i++)B.push({x:Math.random(),y:Math.random(),z:Math.random(),v:.
     g.addColorStop(0,`rgba(160,220,255,${.35*b.z+.08})`);g.addColorStop(1,'rgba(63,140,255,0)');
     cx.fillStyle=g;cx.beginPath();cx.arc(px,b.y*H,r,0,7);cx.fill()}
   requestAnimationFrame(anima)})();
+</script>
+<script>
+try{document.querySelectorAll('.idioma').forEach(a=>a.addEventListener('click',()=>localStorage.setItem('idioma',a.dataset.lang)));
+var esc=localStorage.getItem('idioma'),atual='pt';
+if(!esc&&atual==='pt'){var n=(navigator.language||'pt').slice(0,2);if(n==='en'||n==='es'){esc=n}}
+if(esc&&esc!==atual){var alvo=document.querySelector('.idioma[data-lang="'+esc+'"]');if(alvo&&!sessionStorage.getItem('redirecionou')){sessionStorage.setItem('redirecionou','1');location.replace(alvo.getAttribute('href')+location.hash)}}}catch(e){}
 </script>
 </body>
 </html>
