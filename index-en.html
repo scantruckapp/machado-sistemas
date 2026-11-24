@@ -134,7 +134,10 @@ h2{font-size:clamp(30px,4vw,50px);line-height:1.08;letter-spacing:-1.5px;font-we
 .kit .baldes{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;transform:translateZ(30px)}
 .kit .baldes span{width:22px;height:26px;border-radius:4px 4px 7px 7px;background:linear-gradient(180deg,#dfe7f7,#9fb2d6);box-shadow:inset 0 6px 0 rgba(63,208,255,.8)}
 .kit h3{font-size:22px;transform:translateZ(25px)}
-.kit .preco{font-size:30px;font-weight:900;margin:8px 0 2px;transform:translateZ(35px)}
+.kit small{display:block;margin-top:6px}
+.ver-preco{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:20px;background:#25D366;color:#fff;font-weight:800;padding:13px 16px;border-radius:999px;box-shadow:0 8px 22px rgba(37,211,102,.35);transform:translateZ(35px);transition:transform .2s,box-shadow .2s}
+.ver-preco:hover{box-shadow:0 12px 30px rgba(37,211,102,.6);transform:translateZ(35px) translateY(-2px)}
+.kit.destaque .ver-preco{background:#fff;color:#128C4A}
 .kit small{color:var(--sub)}
 .kit.destaque small{color:#DCE6FF}
 .selo{position:absolute;top:-12px;right:18px;background:var(--ciano);color:var(--navy);font-size:12px;font-weight:800;padding:5px 12px;border-radius:999px}
@@ -299,7 +302,7 @@ footer{position:relative;z-index:1;padding:40px 5vw;color:var(--sub);font-size:1
 <div class="revela esq">
 <span class="tag">KITS</span>
 <h2>A kit for every counter size.</h2>
-<p class="sub">From 1 to 6 wells. Message me on WhatsApp and I'll help you choose the right one for your store.</p>
+<p class="sub">From 1 to 6 wells. Pick your kit and message me on WhatsApp: I'll send you the price and terms right away.</p>
 </div>
 <img alt="Felipe holding a phone" class="personagem revela dir" src="img/celular.webp" style="width:min(260px,60vw);margin:auto"/>
 </div>
@@ -336,15 +339,15 @@ footer{position:relative;z-index:1;padding:40px 5vw;color:var(--sub);font-size:1
 </a>
 <script>
 // ---- kits ----
-const KITS=[[1,1350],[2,1850],[3,2350],[4,2650],[5,2950],[6,3250]];
-const brl=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
-document.getElementById('listaKits').innerHTML=KITS.map(([n,p],i)=>`
+const KITS=[1,2,3,4,5,6];
+const ZAP='https://wa.me/5548999668902?text=';
+document.getElementById('listaKits').innerHTML=KITS.map((n,i)=>`
   <div class="kit revela ${n===2?'destaque':''}" style="position:relative;transition-delay:${i*.06}s">
     ${n===2?'<span class="selo">BEST SELLER</span>':''}
     <div class="baldes">${'<span></span>'.repeat(n)}</div>
     <h3>Kit ${n} ${n>1?'wells':'well'}</h3>
-    <div class="preco">${brl(p)}</div>
     <small>110 V or 220 V · stainless steel wells</small>
+    <a class="ver-preco" href="${ZAP+encodeURIComponent(`Hi! I'd like the price of Kit ${n} (${n} ${n>1?'wells':'well'}).`)}" target="_blank" rel="noopener">💬 Get price on WhatsApp</a>
   </div>`).join('');
 
 // ---- parceiros ----
