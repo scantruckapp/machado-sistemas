@@ -600,6 +600,39 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
 
   const [txtWhats, setTxtWhats] = useState("");
   const [extraindo, setExtraindo] = useState(false);
+  const [qtd, setQtd] = useState("1");
+  const [refAtual, setRefAtual] = useState("");
+  // Transporte
+  const [comTransp, setComTransp] = useState(false);
+  const [listaTransp, setListaTransp] = useState(lerTransportadoras);
+  const [transp, setTransp] = useState({...TRANSPORTADORAS_PADRAO[0]});
+  const [escolhaTransp, setEscolhaTransp] = useState(TRANSPORTADORAS_PADRAO[0].cnpj);
+  const [modFrete, setModFrete] = useState("0");
+  const [volQtd, setVolQtd] = useState("1");
+  const [volEspecie, setVolEspecie] = useState("");
+  const [volMarca, setVolMarca] = useState("");
+  const [volNum, setVolNum] = useState("");
+  const [pesoBruto, setPesoBruto] = useState("");
+  const [pesoLiquido, setPesoLiquido] = useState("");
+  const setT = (campo) => (v) => setTransp(t=>({...t,[campo]:v}));
+  const escolherTransp = (cnpjEscolhido) => {
+    setEscolhaTransp(cnpjEscolhido);
+    if(cnpjEscolhido==="nova") setTransp({...TRANSP_VAZIA});
+    else { const t = listaTransp.find(x=>x.cnpj===cnpjEscolhido); if(t) setTransp({...t}); }
+  };
+
+  const consultar = async () => {
+    if(!refAtual) return;
+    setEmitindo(true);
+    try {
+      const resp = await fetch("/api/nfe?ref="+refAtual);
+      const data = await resp.json();
+      setStatusNfe(data.status||"");
+      if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
+      if(data.status==="erro_autorizacao") alert("Recusada pela SEFAZ:\n"+(data.mensagem_sefaz||JSON.stringify(data.erros||data)));
+    } catch(e){ alert("Erro: "+e.message); }
+    setEmitindo(false);
+  };
 
   const extrairDadosWhats = async () => {
     if(!txtWhats.trim()) return alert("Cole o texto do WhatsApp primeiro!");
@@ -1464,6 +1497,25 @@ function Dashboard({pedidos, usuario}) {
 }
 
 // ── NF-e AVULSA ──────────────────────────────────────────────────────────────
+// Transportadoras já cadastradas (dados tirados das notas anteriores)
+const TRANSPORTADORAS_PADRAO = [
+  { nome:"EXPRESSO SAO MIGUEL S/A", cnpj:"00428307000198", ie:"252936787", endereco:"AC PLINIO ARLINDO DE NES", municipio:"Chapeco", uf:"SC" },
+];
+const lerTransportadoras = () => {
+  try { const extra = JSON.parse(localStorage.getItem("transportadoras_ms")||"[]");
+    const todas = [...TRANSPORTADORAS_PADRAO];
+    extra.forEach(t=>{ if(!todas.some(x=>x.cnpj===t.cnpj)) todas.push(t); });
+    return todas;
+  } catch(e){ return [...TRANSPORTADORAS_PADRAO]; }
+};
+const salvarTransportadora = (t) => {
+  try { if(!t.cnpj || TRANSPORTADORAS_PADRAO.some(x=>x.cnpj===t.cnpj)) return;
+    const extra = JSON.parse(localStorage.getItem("transportadoras_ms")||"[]").filter(x=>x.cnpj!==t.cnpj);
+    extra.push(t); localStorage.setItem("transportadoras_ms", JSON.stringify(extra));
+  } catch(e){}
+};
+const TRANSP_VAZIA = { nome:"", cnpj:"", ie:"", endereco:"", municipio:"", uf:"" };
+
 function NfeAvulsa() {
   const [razao, setRazao] = useState("");
   const [cnpj, setCnpj] = useState("");
@@ -1483,6 +1535,39 @@ function NfeAvulsa() {
   const [linkNfe, setLinkNfe] = useState("");
   const [txtWhats, setTxtWhats] = useState("");
   const [extraindo, setExtraindo] = useState(false);
+  const [qtd, setQtd] = useState("1");
+  const [refAtual, setRefAtual] = useState("");
+  // Transporte
+  const [comTransp, setComTransp] = useState(false);
+  const [listaTransp, setListaTransp] = useState(lerTransportadoras);
+  const [transp, setTransp] = useState({...TRANSPORTADORAS_PADRAO[0]});
+  const [escolhaTransp, setEscolhaTransp] = useState(TRANSPORTADORAS_PADRAO[0].cnpj);
+  const [modFrete, setModFrete] = useState("0");
+  const [volQtd, setVolQtd] = useState("1");
+  const [volEspecie, setVolEspecie] = useState("");
+  const [volMarca, setVolMarca] = useState("");
+  const [volNum, setVolNum] = useState("");
+  const [pesoBruto, setPesoBruto] = useState("");
+  const [pesoLiquido, setPesoLiquido] = useState("");
+  const setT = (campo) => (v) => setTransp(t=>({...t,[campo]:v}));
+  const escolherTransp = (cnpjEscolhido) => {
+    setEscolhaTransp(cnpjEscolhido);
+    if(cnpjEscolhido==="nova") setTransp({...TRANSP_VAZIA});
+    else { const t = listaTransp.find(x=>x.cnpj===cnpjEscolhido); if(t) setTransp({...t}); }
+  };
+
+  const consultar = async () => {
+    if(!refAtual) return;
+    setEmitindo(true);
+    try {
+      const resp = await fetch("/api/nfe?ref="+refAtual);
+      const data = await resp.json();
+      setStatusNfe(data.status||"");
+      if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
+      if(data.status==="erro_autorizacao") alert("Recusada pela SEFAZ:\n"+(data.mensagem_sefaz||JSON.stringify(data.erros||data)));
+    } catch(e){ alert("Erro: "+e.message); }
+    setEmitindo(false);
+  };
 
   const extrairDados = async () => {
     if(!txtWhats.trim()) return alert("Cole o texto primeiro!");
@@ -1513,7 +1598,12 @@ function NfeAvulsa() {
   const emitir = async () => {
     if(!cnpj || !razao) return alert("Preencha pelo menos Razão Social e CPF/CNPJ!");
     if(!valor || parseFloat(valor) <= 0) return alert("Informe o valor da nota!");
-    if(!window.confirm(`Confirma emissão de NF-e avulsa\n\nDestinatário: ${razao}\nValor: R$ ${parseFloat(valor).toLocaleString("pt-BR", {minimumFractionDigits:2})}\n\nEsta nota terá VALOR FISCAL.`)) return;
+    if(comTransp){
+      if(!transp.nome || transp.cnpj.replace(/\D/g,"").length!==14) return alert("Preencha o nome e o CNPJ (14 números) da transportadora!");
+      if(!pesoBruto || !volQtd) return alert("Informe a quantidade de volumes e o peso bruto!");
+    }
+    const resumoTransp = comTransp ? `\nTransportadora: ${transp.nome}\nVolumes: ${volQtd} · Peso bruto: ${pesoBruto} kg` : "";
+    if(!window.confirm(`Confirma emissão de NF-e avulsa\n\nDestinatário: ${razao}\nValor: R$ ${parseFloat(valor).toLocaleString("pt-BR", {minimumFractionDigits:2})}${resumoTransp}\n\nEsta nota terá VALOR FISCAL.`)) return;
     setEmitindo(true);
     setStatusNfe("");
     setLinkNfe("");
@@ -1541,13 +1631,21 @@ function NfeAvulsa() {
           avulsa: true,
           valorAvulso: parseFloat(valor),
           descricaoAvulsa: descricao,
+          qtdAvulsa: parseInt(qtd)||1,
+          ...(comTransp ? { transporte: {
+            ...transp, modalidade: modFrete,
+            quantidade: volQtd, especie: volEspecie, marca: volMarca, numeracao: volNum,
+            pesoBruto, pesoLiquido: pesoLiquido || pesoBruto,
+          }} : {}),
         }})
       });
       const data = await resp.json();
       if(resp.status===200||resp.status===201||resp.status===202) {
         setStatusNfe(data.status||"processando");
         if(data.caminho_danfe) setLinkNfe(data.caminho_danfe);
-        alert("✅ NF-e enviada à SEFAZ!\n\nAguarde alguns segundos e consulte o status.");
+        setRefAtual(data.ref||"");
+        if(comTransp){ salvarTransportadora({...transp, cnpj:transp.cnpj.replace(/\D/g,"")}); setListaTransp(lerTransportadoras()); }
+        alert("✅ NF-e enviada à SEFAZ!\n\nAguarde alguns segundos e clique em 🔄 Consultar status.");
       } else {
         const detErros = data.erros&&data.erros.length>0 ? "\n\nDetalhes:\n"+data.erros.map(e=>"• "+(e.codigo||"")+": "+(e.mensagem||JSON.stringify(e))).join("\n") : "";
         alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data))+detErros);
@@ -1605,17 +1703,63 @@ function NfeAvulsa() {
 
       <Card>
         <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Nota Fiscal</div>
-        <Campo label="Valor (R$)" value={valor} onChange={setValor} type="number" placeholder="0,00"/>
-        <Campo label="Descrição do produto/serviço" value={descricao} onChange={setDescricao} placeholder="Kit Automatico 220v"/>
+        <Campo label="Descrição do produto/serviço" value={descricao} onChange={setDescricao} placeholder="Kit 4 Baldes Automatico 220v"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:10}}>
+          <Campo label="Quantidade" value={qtd} onChange={setQtd} type="number" placeholder="1"/>
+          <Campo label="Valor TOTAL da nota (R$)" value={valor} onChange={setValor} type="number" placeholder="0,00"/>
+        </div>
         <Sel label="Forma de pagamento" value={formaPgto} onChange={setFormaPgto}
           opts={[{v:"pix",l:"PIX"},{v:"cartao",l:"Cartão"},{v:"boleto",l:"Boleto"}]}/>
+      </Card>
+
+      <Card>
+        <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
+          <input type="checkbox" checked={comTransp} onChange={e=>setComTransp(e.target.checked)} style={{width:20,height:20,accentColor:S.verde}}/>
+          <span style={{fontSize:12,fontWeight:700,color:S.verde,textTransform:"uppercase",letterSpacing:1}}>🚚 Enviar por transportadora</span>
+        </label>
+        {comTransp&&(
+          <div style={{marginTop:14}}>
+            <Sel label="Transportadora" value={escolhaTransp} onChange={escolherTransp}
+              opts={[...listaTransp.map(t=>({v:t.cnpj,l:t.nome})),{v:"nova",l:"➕ Outra transportadora"}]}/>
+            <Campo label="Razão social" value={transp.nome} onChange={setT("nome")} placeholder="Nome da transportadora"/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <Campo label="CNPJ (só números)" value={transp.cnpj} onChange={setT("cnpj")} placeholder="00000000000000"/>
+              <Campo label="Inscrição estadual" value={transp.ie} onChange={setT("ie")} placeholder="Opcional"/>
+            </div>
+            <Campo label="Endereço" value={transp.endereco} onChange={setT("endereco")} placeholder="Rua, número"/>
+            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
+              <Campo label="Município" value={transp.municipio} onChange={setT("municipio")} placeholder="Cidade"/>
+              <Campo label="UF" value={transp.uf} onChange={setT("uf")} placeholder="SC"/>
+            </div>
+            <Sel label="Frete por conta" value={modFrete} onChange={setModFrete}
+              opts={[{v:"0",l:"0 - Remetente (CIF) — a Machado paga"},{v:"1",l:"1 - Destinatário (FOB) — o cliente paga"},{v:"2",l:"2 - Terceiros"},{v:"9",l:"9 - Sem frete"}]}/>
+            <div style={{fontSize:12,fontWeight:700,color:S.verde,margin:"6px 0 10px",textTransform:"uppercase",letterSpacing:1}}>📦 Volumes</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <Campo label="Quantidade de volumes" value={volQtd} onChange={setVolQtd} type="number" placeholder="1"/>
+              <Campo label="Espécie" value={volEspecie} onChange={setVolEspecie} placeholder="Ex.: CAIXA"/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <Campo label="Peso bruto (kg)" value={pesoBruto} onChange={setPesoBruto} type="number" placeholder="5,000"/>
+              <Campo label="Peso líquido (kg)" value={pesoLiquido} onChange={setPesoLiquido} type="number" placeholder="Igual ao bruto"/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <Campo label="Marca" value={volMarca} onChange={setVolMarca} placeholder="Opcional"/>
+              <Campo label="Numeração" value={volNum} onChange={setVolNum} placeholder="Opcional"/>
+            </div>
+          </div>
+        )}
       </Card>
 
       {statusNfe&&(
         <Card>
           <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Status</div>
-          <div style={{fontSize:14,fontWeight:700,color:S.verde,marginBottom:8}}>{statusNfe}</div>
-          {linkNfe&&<a href={linkNfe} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#3B82F6"}}>📄 Ver DANFE</a>}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+            <div style={{fontSize:14,fontWeight:700,color:statusNfe==="autorizado"?S.verde:statusNfe==="erro_autorizacao"?"#F87171":"#FBBF24"}}>
+              {({autorizado:"Autorizada",erro_autorizacao:"Recusada pela SEFAZ",processando_autorizacao:"Processando..."})[statusNfe]||statusNfe}
+            </div>
+            {refAtual&&<Btn onClick={consultar} disabled={emitindo}>🔄 Consultar status</Btn>}
+          </div>
+          {linkNfe&&<a href={linkNfe} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#3B82F6",display:"block",marginTop:8}}>📄 Ver DANFE</a>}
         </Card>
       )}
 

@@ -51,6 +51,8 @@ function montarNota(pedido, opc = {}) {
   const isAvulsa = !!pedido.avulsa;
   const valorAvulso = pedido.valorAvulso || pedido.totalFinal;
   const descAvulsa = pedido.descricaoAvulsa || 'Kit Automatico';
+  const qtdAvulsa = Math.max(1, Number(pedido.qtdAvulsa) || 1);
+  const unitAvulso = Number((valorAvulso / qtdAvulsa).toFixed(4));
 
   const itens = isAvulsa ? [{
     numero_item:               1,
@@ -59,10 +61,10 @@ function montarNota(pedido, opc = {}) {
     codigo_ncm:                '84248990',
     cfop:                      cfop,
     unidade_comercial:         'UN',
-    quantidade_comercial:      1,
-    valor_unitario_comercial:  Number(valorAvulso.toFixed(2)),
-    valor_unitario_tributavel: Number(valorAvulso.toFixed(2)),
-    quantidade_tributavel:     1,
+    quantidade_comercial:      qtdAvulsa,
+    valor_unitario_comercial:  unitAvulso,
+    valor_unitario_tributavel: unitAvulso,
+    quantidade_tributavel:     qtdAvulsa,
     unidade_tributavel:        'UN',
     valor_bruto:               Number(valorAvulso.toFixed(2)),
     inclui_no_total:           1,
@@ -106,6 +108,31 @@ function montarNota(pedido, opc = {}) {
   // IE: 1=contribuinte (CNPJ+IE), 9=nao contribuinte/CPF sem IE
   const indIE = (cnpj.length === 14 && ie && ie.trim()) ? 1 : 9;
 
+  // ── Transporte (transportadora, frete e volumes) ─────────────────────────
+  // modalidade_frete: 0 = por conta do remetente (CIF), 1 = destinatário (FOB),
+  // 2 = terceiros, 9 = sem frete. Sem transportadora informada: segue como antes.
+  const tr = pedido.transporte || null;
+  const so = (v) => String(v || '').trim();
+  const num = (v) => Number(String(v || '').replace(',', '.')) || 0;
+  const transporte = {};
+  if (tr && !dev) {
+    if (so(tr.cnpj)) transporte.cnpj_transportador = so(tr.cnpj).replace(/\D/g, '');
+    if (so(tr.nome)) transporte.nome_transportador = so(tr.nome);
+    if (so(tr.ie)) transporte.inscricao_estadual_transportador = so(tr.ie).replace(/\D/g, '');
+    if (so(tr.endereco)) transporte.endereco_transportador = so(tr.endereco);
+    if (so(tr.municipio)) transporte.municipio_transportador = so(tr.municipio);
+    if (so(tr.uf)) transporte.uf_transportador = so(tr.uf).toUpperCase();
+    const vol = {};
+    if (num(tr.quantidade)) vol.quantidade = Math.round(num(tr.quantidade));
+    if (so(tr.especie)) vol.especie = so(tr.especie);
+    if (so(tr.marca)) vol.marca = so(tr.marca);
+    if (so(tr.numeracao)) vol.numero = so(tr.numeracao);
+    if (num(tr.pesoBruto)) vol.peso_bruto = num(tr.pesoBruto);
+    if (num(tr.pesoLiquido)) vol.peso_liquido = num(tr.pesoLiquido);
+    if (Object.keys(vol).length) transporte.volumes = [vol];
+  }
+  const modFrete = dev ? 9 : (tr && tr.modalidade !== undefined && tr.modalidade !== '' ? Number(tr.modalidade) : 3);
+
   const nfeData = {
     cnpj_emitente:              CNPJ_EMITENTE,
     data_emissao:               dataEmissao,
@@ -131,7 +158,8 @@ function montarNota(pedido, opc = {}) {
     formas_pagamento: dev
       ? [{ forma_pagamento: '90', valor_pagamento: 0 }]   // 90 = sem pagamento
       : [{ forma_pagamento: pgtoCode, valor_pagamento: Number(pedido.totalFinal.toFixed(2)) }],
-    modalidade_frete:   dev ? 9 : 3,
+    modalidade_frete:   modFrete,
+    ...transporte,
     finalidade_emissao: dev ? 4 : 1,               // 4 = devolução
     ...(dev ? { notas_referenciadas: [{ chave_nfe: opc.chaveOriginal }] } : {}),
   };
