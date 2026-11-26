@@ -1071,27 +1071,128 @@ function NfeEmissor({pedido, onAtualizar}) {
     setEmitindo(false);
   };
 
+  // ── Cancelar NF-e (SEFAZ aceita até 24 h depois da autorização) ──
+  const cancelarNfe = async () => {
+    const ref = nfeRef || pedido.nfeRef;
+    if(!ref) return alert("Esta nota não tem referência salva. Consulte o status primeiro.");
+    const just = window.prompt("Motivo do cancelamento (mínimo 15 letras).\nEx.: Cliente desistiu da compra antes do envio");
+    if(just===null) return;
+    if(just.trim().length<15) return alert("O motivo precisa ter pelo menos 15 caracteres.");
+    if(!window.confirm("Cancelar esta NF-e na SEFAZ?\n\nIsso não pode ser desfeito.")) return;
+    setEmitindo(true);
+    try {
+      const resp = await fetch("/api/nfe",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({ref,justificativa:just.trim()})});
+      const data = await resp.json();
+      if(resp.ok && data.status==="cancelado"){
+        setStatusNfe("cancelado");
+        onAtualizar({...pedido,statusNfe:"cancelado",nfeRef:ref});
+        alert("✅ NF-e cancelada na SEFAZ.");
+      } else {
+        const msg = data.mensagem_sefaz || data.mensagem || JSON.stringify(data);
+        alert("Não foi possível cancelar: "+msg+"\n\nSe já passaram 24 horas da emissão, use a NF de devolução.");
+      }
+    } catch(e){ alert("Erro: "+e.message); }
+    setEmitindo(false);
+  };
+
+  // ── NF de devolução (entrada, referenciando a nota original) ──
+  const refDev = "dev_"+pedido.id;
+  const [statusDev, setStatusDev] = useState("");
+  const [linkDev, setLinkDev] = useState("");
+
+  const consultarDev = async (silencioso) => {
+    try {
+      const resp = await fetch("/api/nfe?ref="+refDev);
+      if(resp.status===404) return;
+      const data = await resp.json();
+      if(data.status){ setStatusDev(data.status); if(data.caminho_danfe) setLinkDev(data.caminho_danfe); }
+      if(!silencioso && data.status==="erro_autorizacao") alert("A devolução foi recusada pela SEFAZ:\n"+(data.mensagem_sefaz||JSON.stringify(data.erros||data)));
+    } catch(e){ if(!silencioso) alert("Erro: "+e.message); }
+  };
+  useEffect(()=>{ if(pedido.statusNfe==="autorizado") consultarDev(true); /* eslint-disable-next-line */ },[]);
+
+  const emitirDevolucao = async () => {
+    const ref = nfeRef || pedido.nfeRef;
+    if(!ref) return alert("Esta nota não tem referência salva. Consulte o status primeiro.");
+    if(!window.confirm("Emitir NF-e de DEVOLUÇÃO desta venda?\n\nUse quando o cliente devolveu o produto e já passou o prazo de cancelamento.\nA nota volta todos os itens da venda original e tem VALOR FISCAL.")) return;
+    setEmitindo(true);
+    try {
+      const resp = await fetch("/api/nfe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        acao:"devolucao", ref, refDevolucao:refDev,
+        pedido:{
+          id:pedido.id, kits:pedido.kits, totalFinal:pedido.totalFinal,
+          clienteRazao:pedido.clienteRazao, clienteCnpj:(pedido.clienteCnpj||"").replace(/\D/g,""),
+          clienteEmail:pedido.clienteEmail, clienteCep:pedido.clienteCep,
+          clienteLogradouro:pedido.clienteLogradouro, clienteNumero:pedido.clienteNumero,
+          clienteBairro:pedido.clienteBairro, clienteCidade:pedido.clienteCidade,
+          clienteUf:pedido.clienteUf||"SC", clienteIe:pedido.clienteIe, formaPgto:pedido.formaPgto||"pix",
+        }
+      })});
+      const data = await resp.json();
+      if(resp.ok){
+        setStatusDev(data.status||"processando_autorizacao");
+        alert("✅ Devolução enviada à SEFAZ!\n\nAguarde alguns segundos e clique em 🔄 na devolução para ver o status.");
+      } else {
+        const det = data.erros && data.erros.length ? "\n\n"+data.erros.map(e=>"• "+(e.codigo||"")+": "+(e.mensagem||JSON.stringify(e))).join("\n") : "";
+        alert("Erro: "+(data.mensagem||data.erro||JSON.stringify(data))+det);
+      }
+    } catch(e){ alert("Erro: "+e.message); }
+    setEmitindo(false);
+  };
+
+  // Limpa a nota do pedido (para nota recusada ou cancelada) e libera emitir de novo
+  const removerNfe = () => {
+    if(!window.confirm("Remover esta nota do pedido?\n\nIsso só limpa o registro aqui no sistema, não mexe na SEFAZ.")) return;
+    setStatusNfe(""); setLinkNfe(""); setNfeRef("");
+    onAtualizar({...pedido,statusNfe:"",linkNfe:"",nfeRef:""});
+  };
+
+  const autorizada = statusNfe==="autorizado";
+  const emAndamento = statusNfe==="processando_autorizacao";
+  const podeEmitir = !autorizada && !emAndamento;
+  const devAtiva = statusDev==="autorizado"||statusDev==="processando_autorizacao";
+  const corStatus = {autorizado:"#00C896",cancelado:"#F87171",erro_autorizacao:"#F87171",processando_autorizacao:"#FBBF24"};
+  const nomeStatus = {autorizado:"Autorizada",cancelado:"Cancelada",erro_autorizacao:"Recusada pela SEFAZ",processando_autorizacao:"Processando..."};
+  const btn = (bg,cor)=>({background:bg,color:cor,border:"none",borderRadius:12,padding:"11px 14px",fontWeight:700,fontSize:13,cursor:emitindo?"not-allowed":"pointer",opacity:emitindo?0.7:1});
+
   return (
     <div style={{padding:"0 16px 16px"}}>
       <div style={{background:"#1E2530",borderRadius:16,padding:18,border:"1px solid #2D3748"}}>
         <div style={{fontSize:12,fontWeight:700,color:"#00C896",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>🧾 Nota Fiscal</div>
         {statusNfe&&(
-          <div style={{background:"#00C89611",border:"1px solid #00C896",borderRadius:10,padding:12,marginBottom:14}}>
+          <div style={{background:(corStatus[statusNfe]||"#00C896")+"11",border:"1px solid "+(corStatus[statusNfe]||"#00C896"),borderRadius:10,padding:12,marginBottom:14}}>
             <div style={{fontSize:13,color:"#9CA3AF",marginBottom:4}}>Status:</div>
-            <div style={{fontSize:14,fontWeight:700,color:"#00C896"}}>{statusNfe}</div>
+            <div style={{fontSize:14,fontWeight:700,color:corStatus[statusNfe]||"#00C896"}}>{nomeStatus[statusNfe]||statusNfe}</div>
             {linkNfe&&<a href={linkNfe} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#3B82F6",display:"block",marginTop:8}}>📄 Ver DANFE</a>}
           </div>
         )}
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={emitirNfe} disabled={emitindo} style={{
-            flex:1,background:"#00C896",color:"#0D1117",border:"none",borderRadius:12,
-            padding:"12px 0",fontWeight:700,fontSize:14,cursor:emitindo?"not-allowed":"pointer",opacity:emitindo?0.7:1
-          }}>{emitindo?"⏳ Aguarde...":"🧾 Emitir NF-e"}</button>
-          {statusNfe&&<button onClick={consultarNfe} disabled={emitindo} style={{
-            background:"#2D3748",color:"#F1F5F9",border:"none",borderRadius:12,
-            padding:"12px 16px",fontWeight:600,fontSize:13,cursor:"pointer"
-          }}>🔄</button>}
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          {podeEmitir&&<button onClick={emitirNfe} disabled={emitindo} style={{...btn("#00C896","#0D1117"),flex:1,padding:"12px 0",fontSize:14}}>{emitindo?"⏳ Aguarde...":"🧾 Emitir NF-e"}</button>}
+          {statusNfe&&<button onClick={consultarNfe} disabled={emitindo} style={btn("#2D3748","#F1F5F9")}>🔄</button>}
         </div>
+        {autorizada&&(
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:10}}>
+            <button onClick={cancelarNfe} disabled={emitindo} style={{...btn("#7F1D1D","#FECACA"),flex:1}}>❌ Cancelar NF-e</button>
+            {!devAtiva&&<button onClick={emitirDevolucao} disabled={emitindo} style={{...btn("#1E3A8A","#BFDBFE"),flex:1}}>↩️ NF de devolução</button>}
+          </div>
+        )}
+        {autorizada&&<div style={{fontSize:11,color:"#6B7280",marginTop:8}}>Cancelar: até 24 h depois da emissão. Depois disso, use a NF de devolução.</div>}
+        {(statusNfe==="erro_autorizacao"||statusNfe==="cancelado")&&(
+          <button onClick={removerNfe} disabled={emitindo} style={{...btn("transparent","#9CA3AF"),border:"1px solid #374151",width:"100%",marginTop:10}}>🗑️ Remover nota do pedido</button>
+        )}
+        {statusDev&&(
+          <div style={{background:"#1E3A8A22",border:"1px solid #3B82F6",borderRadius:10,padding:12,marginTop:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:13,color:"#9CA3AF",marginBottom:4}}>↩️ NF de devolução:</div>
+                <div style={{fontSize:14,fontWeight:700,color:corStatus[statusDev]||"#BFDBFE"}}>{nomeStatus[statusDev]||statusDev}</div>
+              </div>
+              <button onClick={()=>consultarDev(false)} disabled={emitindo} style={btn("#2D3748","#F1F5F9")}>🔄</button>
+            </div>
+            {linkDev&&<a href={linkDev} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#3B82F6",display:"block",marginTop:8}}>📄 Ver DANFE da devolução</a>}
+            {statusDev==="erro_autorizacao"&&<button onClick={emitirDevolucao} disabled={emitindo} style={{...btn("#1E3A8A","#BFDBFE"),width:"100%",marginTop:10}}>↩️ Tentar devolução de novo</button>}
+          </div>
+        )}
       </div>
     </div>
   );

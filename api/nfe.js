@@ -1,24 +1,32 @@
-export default async function handler(req, res) {
-  // ── GET: consulta status ──────────────────────────────────────────────────
-  if (req.method === 'GET') {
-    const { ref } = req.query;
-    const TOKEN = 'nTDNWgdjRYRBwiGrCqbGDn83BoZn2pas'; // PRODUÇÃO
-    try {
-      const response = await fetch(
-        `https://api.focusnfe.com.br/v2/nfe/${ref}`,
-        { headers: { 'Authorization': 'Basic ' + Buffer.from(TOKEN + ':').toString('base64') } }
-      );
-      return res.status(response.status).json(await response.json());
-    } catch (e) {
-      return res.status(500).json({ error: e.message });
-    }
+// Token da Focus NFe: fica nas variáveis de ambiente da Vercel (FOCUS_NFE_TOKEN),
+// nunca no código — o repositório é público.
+const TOKEN = process.env.FOCUS_NFE_TOKEN;
+const CNPJ_EMITENTE = '40478144000172';
+const FOCUS = 'https://api.focusnfe.com.br/v2/nfe';
+const auth = () => ({ 'Authorization': 'Basic ' + Buffer.from(TOKEN + ':').toString('base64') });
+
+// Data de emissão (Vercel roda em UTC, -00:00 evita rejeição 703)
+const dataAgora = () => {
+  const agora = new Date(Date.now() - 10 * 60 * 1000);
+  const pad = (n) => String(n).padStart(2,'0');
+  return agora.getUTCFullYear() + '-' + pad(agora.getUTCMonth()+1) + '-' + pad(agora.getUTCDate()) + 'T' + pad(agora.getUTCHours()) + ':' + pad(agora.getUTCMinutes()) + ':' + pad(agora.getUTCSeconds()) + '-00:00';
+};
+
+const responder = async (res, response, extra = {}) => {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return res.status(response.status).json({
+      mensagem: data.mensagem || JSON.stringify(data),
+      erros:    data.erros    || [],
+      erro:     JSON.stringify(data),
+    });
   }
+  return res.status(response.status).json({ ...data, ...extra });
+};
 
-  if (req.method !== 'POST') return res.status(405).end();
-
-  const { pedido } = req.body;
-  const TOKEN = 'nTDNWgdjRYRBwiGrCqbGDn83BoZn2pas'; // PRODUÇÃO
-  const CNPJ_EMITENTE = '40478144000172';
+// Monta o JSON da nota (venda ou devolução) a partir do pedido
+function montarNota(pedido, opc = {}) {
+  const dev = !!opc.devolucao;
 
   // ── Normaliza campos (camelCase e snake_case) ────────────────────────────
   const uf        = (pedido.clienteUf        || pedido.cliente_uf        || 'SC').toUpperCase();
@@ -33,12 +41,10 @@ export default async function handler(req, res) {
   const ie        = pedido.clienteIe         || pedido.cliente_ie        || '';
   const formaPgto = pedido.formaPgto         || pedido.forma_pgto        || 'pix';
 
-  const cfop = uf === 'SC' ? '5102' : '6102';
+  // Venda: 5102/6102. Devolução de venda (entrada): 1202/2202
+  const cfop = dev ? (uf === 'SC' ? '1202' : '2202') : (uf === 'SC' ? '5102' : '6102');
 
-  // ── Data de emissão (Vercel roda em UTC, -00:00 evita rejeicao 703) ──────
-  const agora = new Date(Date.now() - 10 * 60 * 1000);
-  const pad = (n) => String(n).padStart(2,'0');
-  const dataEmissao = agora.getUTCFullYear() + '-' + pad(agora.getUTCMonth()+1) + '-' + pad(agora.getUTCDate()) + 'T' + pad(agora.getUTCHours()) + ':' + pad(agora.getUTCMinutes()) + ':' + pad(agora.getUTCSeconds()) + '-00:00';
+  const dataEmissao = dataAgora();
 
   // ── Itens ─────────────────────────────────────────────────────────────────
   // Suporte a NF-e avulsa com valor e descrição customizados
@@ -104,9 +110,9 @@ export default async function handler(req, res) {
     cnpj_emitente:              CNPJ_EMITENTE,
     data_emissao:               dataEmissao,
     data_saida_entrada:         dataEmissao,
-    natureza_operacao:          'Venda de mercadoria',
-    forma_pagamento:            0,
-    tipo_documento:             1,
+    natureza_operacao:          dev ? 'Devolucao de venda' : 'Venda de mercadoria',
+    ...(dev ? {} : { forma_pagamento: 0 }),
+    tipo_documento:             dev ? 0 : 1,   // 0 = entrada (a mercadoria volta), 1 = saída
     local_destino:              uf === 'SC' ? 1 : 2,
     consumidor_final:           1,
     presenca_comprador:         2,
@@ -122,13 +128,79 @@ export default async function handler(req, res) {
     indicador_inscricao_estadual_destinatario: indIE,
     ...(ie && indIE === 1 ? { inscricao_estadual_destinatario: ie } : {}),
     items: itens,
-    formas_pagamento: [{
-      forma_pagamento:  pgtoCode,
-      valor_pagamento:  Number(pedido.totalFinal.toFixed(2)),
-    }],
-    modalidade_frete:   3,
-    finalidade_emissao: 1,
+    formas_pagamento: dev
+      ? [{ forma_pagamento: '90', valor_pagamento: 0 }]   // 90 = sem pagamento
+      : [{ forma_pagamento: pgtoCode, valor_pagamento: Number(pedido.totalFinal.toFixed(2)) }],
+    modalidade_frete:   dev ? 9 : 3,
+    finalidade_emissao: dev ? 4 : 1,               // 4 = devolução
+    ...(dev ? { notas_referenciadas: [{ chave_nfe: opc.chaveOriginal }] } : {}),
   };
+  return nfeData;
+
+}
+
+export default async function handler(req, res) {
+  if (!TOKEN) {
+    return res.status(500).json({ mensagem: 'Token da Focus NFe não configurado. Cadastre FOCUS_NFE_TOKEN nas variáveis de ambiente da Vercel.' });
+  }
+
+  // ── GET: consulta status ──────────────────────────────────────────────────
+  if (req.method === 'GET') {
+    const { ref } = req.query;
+    try {
+      const response = await fetch(`${FOCUS}/${encodeURIComponent(ref)}`, { headers: auth() });
+      return res.status(response.status).json(await response.json());
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── DELETE: cancela a NF-e na SEFAZ (prazo: até 24 h após a autorização) ──
+  if (req.method === 'DELETE') {
+    const { ref, justificativa } = req.body || {};
+    if (!ref) return res.status(400).json({ mensagem: 'Informe a referência (ref) da nota.' });
+    const just = String(justificativa || '').trim();
+    if (just.length < 15 || just.length > 255) {
+      return res.status(400).json({ mensagem: 'A justificativa precisa ter entre 15 e 255 caracteres.' });
+    }
+    try {
+      const response = await fetch(`${FOCUS}/${encodeURIComponent(ref)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...auth() },
+        body: JSON.stringify({ justificativa: just }),
+      });
+      return responder(res, response);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const { pedido } = req.body;
+
+  // ── Devolução: NF-e de entrada referenciando a nota original ─────────────
+  if (req.body.acao === 'devolucao') {
+    const { ref, refDevolucao } = req.body;
+    if (!ref || !refDevolucao || !pedido) return res.status(400).json({ mensagem: 'Informe o pedido, a nota original (ref) e a referência da devolução.' });
+    try {
+      const r0 = await fetch(`${FOCUS}/${encodeURIComponent(ref)}`, { headers: auth() });
+      const orig = await r0.json();
+      if (!r0.ok) return res.status(r0.status).json({ mensagem: 'Não encontrei a nota original: ' + (orig.mensagem || r0.status) });
+      if (orig.status !== 'autorizado' || !orig.chave_nfe) return res.status(400).json({ mensagem: `A nota original está "${orig.status}". Só dá para fazer devolução de uma nota autorizada.` });
+      const nfeDev = montarNota(pedido, { devolucao: true, chaveOriginal: orig.chave_nfe });
+      const response = await fetch(`${FOCUS}?ref=${encodeURIComponent(refDevolucao)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth() },
+        body: JSON.stringify(nfeDev),
+      });
+      return responder(res, response, { ref: refDevolucao });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  const nfeData = montarNota(pedido);
 
   // Ref único por emissão — evita erro 539 de duplicidade
   const nfeRef = `prod_${pedido.id}_${Date.now()}`;
