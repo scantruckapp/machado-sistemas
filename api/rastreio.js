@@ -175,8 +175,12 @@ async function processar(p, { avisar, teste }) {
       const et = classificar(e);
       if (et === 'problema' || et !== etapaAvisada) { paraAvisar.push(e); etapaAvisada = et; }
     }
-    // Se ficaram vários pendentes (ex.: primeiro dia do robô), manda só o mais recente
-    const envio = paraAvisar.length > 1 ? [paraAvisar[paraAvisar.length - 1]] : paraAvisar;
+    // Se ficaram vários pendentes (ex.: primeiro dia do robô), manda só o mais recente,
+    // e só se for recente (até 48 h). Evento antigo é marcado como avisado, sem mandar.
+    const recente = (e) => !e.data || (Date.now() - new Date(e.data).getTime()) < 48 * 3600e3;
+    const ultimoPendente = paraAvisar[paraAvisar.length - 1];
+    const envio = ultimoPendente && recente(ultimoPendente) ? [ultimoPendente] : [];
+    if (ultimoPendente && !envio.length) res.avisos.push({ etapa: classificar(ultimoPendente), ignorado: 'etapa antiga (mais de 48 h), não avisado' });
     const numero = telefoneWhats(p.telefone);
     for (const e of envio) {
       const et = classificar(e);
@@ -189,7 +193,7 @@ async function processar(p, { avisar, teste }) {
       } catch (err) { res.avisos.push({ etapa: et, para: numero, erro: err.message }); }
     }
     const enviados = res.avisos.filter((a) => a.ok).length;
-    if (!teste && (enviados || (novos.length && !paraAvisar.length))) {
+    if (!teste && (enviados || (novos.length && !envio.length))) {
       patch.rastreio_avisado = chaveEvento(novos[novos.length - 1]);
       patch.rastreio_etapa_avisada = classificar(novos[novos.length - 1]);
     }
