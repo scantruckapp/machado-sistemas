@@ -121,7 +121,14 @@ const chaveEvento = (e) => `${e.data}|${e.codigo}|${e.tipo}`;
 
 // Telefone no formato do WhatsApp: 55 + DDD + número
 export function telefoneWhats(tel) {
-  let n = String(tel || '').replace(/\D/g, '');
+  const t = String(tel || '').trim();
+  // Internacional salvo com "+" (ex: +595 981 123 456, +351 912 345 678)
+  if (t.startsWith('+') && !t.startsWith('+55')) {
+    const d = t.replace(/\D/g, '');
+    return d.length >= 8 && d.length <= 15 ? d : null;
+  }
+  let n = t.replace(/\D/g, '');
+  if (n.startsWith('55') && (n.length === 12 || n.length === 13)) return n;
   if (n.startsWith('0')) n = n.replace(/^0+/, '');
   if (n.length === 10 || n.length === 11) n = '55' + n;
   return /^55\d{10,11}$/.test(n) ? n : null;

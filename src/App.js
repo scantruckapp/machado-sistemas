@@ -233,6 +233,72 @@ const Campo = ({label, value, onChange, type="text", placeholder=""}) => (
   </div>
 );
 
+
+// ── Telefone com máscara por país ──
+const PAISES = [
+  {c:"55",  f:"🇧🇷", n:"Brasil",   min:10, max:11, ex:"(48) 99966-8902"},
+  {c:"595", f:"🇵🇾", n:"Paraguai", min:9,  max:9,  ex:"981 123 456"},
+  {c:"351", f:"🇵🇹", n:"Portugal", min:9,  max:9,  ex:"912 345 678"},
+  {c:"54",  f:"🇦🇷", n:"Argentina",min:10, max:11, ex:"9 11 2345-6789"},
+  {c:"598", f:"🇺🇾", n:"Uruguai",  min:8,  max:8,  ex:"94 123 456"},
+  {c:"1",   f:"🇺🇸", n:"EUA",      min:10, max:10, ex:"(305) 123-4567"},
+  {c:"",    f:"🌐", n:"Outro",     min:6,  max:15, ex:"código do país + número"},
+];
+const mascaraNum = (c, d) => {
+  if(c==="55"){ d=d.slice(0,11);
+    if(d.length<=2) return d.length?"("+d:"";
+    const ddd=d.slice(0,2), r=d.slice(2);
+    if(r.length<=4) return `(${ddd}) ${r}`;
+    const corte = d.length===11?5:4;
+    return `(${ddd}) ${r.slice(0,corte)}${r.length>corte?"-"+r.slice(corte):""}`; }
+  if(c==="1"){ d=d.slice(0,10);
+    if(d.length<=3) return d; if(d.length<=6) return `(${d.slice(0,3)}) ${d.slice(3)}`;
+    return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`; }
+  return d.slice(0,15).replace(/(\d{3})(?=\d)/g,"$1 ");
+};
+// "+595 981 123 456" → {c:"595", d:"981123456"}; número antigo sem "+" = Brasil
+const lerTel = (t) => {
+  t=String(t||"").trim();
+  if(!t.startsWith("+")) return {c:"55", d:t.replace(/\D/g,"").replace(/^0+/,"").replace(/^55(?=\d{10,11}$)/,"")};
+  const dig=t.replace(/\D/g,"");
+  const p=PAISES.filter(x=>x.c).sort((a,b)=>b.c.length-a.c.length).find(x=>dig.startsWith(x.c));
+  return p?{c:p.c,d:dig.slice(p.c.length)}:{c:"",d:dig};
+};
+const montarTel = (c,d) => c==="55" ? `+55 ${mascaraNum("55",d)}` : `+${c}${c?" ":""}${mascaraNum(c,d)}`.replace("+ ","+");
+const telValido = (t) => { const {c,d}=lerTel(t); const p=PAISES.find(x=>x.c===c)||PAISES[PAISES.length-1];
+  if(c==="55") return d.length===10||d.length===11; return d.length>=p.min && d.length<=p.max; };
+
+const CampoTel = ({value, onChange}) => {
+  const ini = lerTel(value);
+  const [pais, setPais] = useState(PAISES.find(x=>x.c===ini.c)?ini.c:"");
+  const [dig, setDig] = useState(ini.d);
+  const p = PAISES.find(x=>x.c===pais) || PAISES[PAISES.length-1];
+  const emit = (c,d) => onChange(d ? montarTel(c,d) : "");
+  const trocaPais = (c) => { setPais(c); emit(c,dig); };
+  const trocaNum = (v) => { let d=v.replace(/\D/g,"");
+    if(pais===""){ d=d.slice(0,15); setDig(d); onChange(d?"+"+d:""); return; }
+    d=d.slice(0,p.max); setDig(d); emit(pais,d); };
+  const ok = dig && (pais==="" ? dig.length>=8 : dig.length>=p.min);
+  return (
+    <div style={{marginBottom:13}}>
+      <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>WhatsApp do cliente</div>
+      <div style={{display:"flex",gap:8}}>
+        <select value={pais} onChange={e=>trocaPais(e.target.value)}
+          style={{background:S.card2,border:"1px solid "+S.borda,borderRadius:10,padding:"11px 10px",color:S.txt,fontSize:14,minWidth:150}}>
+          {PAISES.map(x=><option key={x.n} value={x.c}>{x.f} {x.n}{x.c?` +${x.c}`:""}</option>)}
+        </select>
+        <input type="tel" inputMode="numeric" value={pais===""?dig:mascaraNum(pais,dig)} onChange={e=>trocaNum(e.target.value)}
+          placeholder={"ex: "+p.ex}
+          style={{flex:1,background:S.card2,border:"1px solid "+(dig&&!ok?"#e0a030":S.borda),borderRadius:10,padding:"11px 14px",color:S.txt,fontSize:14,boxSizing:"border-box",outline:"none"}}/>
+      </div>
+      <div style={{fontSize:11,marginTop:4,color:!dig?S.dim:ok?"#2ecc71":"#e0a030"}}>
+        {!dig ? (pais==="55"?"DDD + número (o 9 do celular entra automático na máscara)":"Digite o número sem o código do país")
+          : ok ? "✓ Número completo — recebe os avisos de rastreio" : `Faltam dígitos (${p.n}: ${p.min}${p.max!==p.min?"–"+p.max:""} números)`}
+      </div>
+    </div>
+  );
+};
+
 const Sel = ({label, value, onChange, opts}) => (
   <div style={{marginBottom:13}}>
     {label && <div style={{fontSize:12,color:S.sub,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>{label}</div>}
@@ -391,8 +457,7 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
   const salvar = () => {
     if(!cliente.trim()) return alert("Informe o nome do cliente!");
     if(!tel.trim()) return alert("Informe o telefone!");
-    const digTel = tel.replace(/\D/g,"");
-    if(digTel.length<10 && !window.confirm("O telefone não tem DDD + número completo.\n\nSem ele, o cliente NÃO recebe os avisos de rastreio no WhatsApp.\n\nSalvar assim mesmo?")) return;
+    if(!telValido(tel) && !window.confirm("O telefone está incompleto.\n\nSem ele, o cliente NÃO recebe os avisos de rastreio no WhatsApp.\n\nSalvar assim mesmo?")) return;
     onSalvar({
       id: ed.id||uid(),
       cliente: cliente.trim(), telefone: tel.trim(),
@@ -422,7 +487,7 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
         <Card>
           <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Cliente</div>
           <Campo label="Nome do cliente" value={cliente} onChange={setCliente} placeholder="Nome completo"/>
-          <Campo label="WhatsApp do cliente (com DDD)" value={tel} onChange={setTel} placeholder="ex: 48 99966-8902" type="tel"/>
+          <CampoTel value={tel} onChange={setTel}/>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             <Campo label="Data do pedido" value={dataPedido} onChange={onDataPedido} type="date"/>
             <Campo label="Prev. envio (15 dias úteis)" value={dataEnvio} onChange={setDataEnvio} type="date"/>
