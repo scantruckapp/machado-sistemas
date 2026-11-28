@@ -76,7 +76,7 @@ async function obterToken() {
 async function consultarCorreios(codigo) {
   const token = await obterToken();
   const r = await fetch(`${CORREIOS}/srorastro/v1/objetos/${encodeURIComponent(codigo)}?resultado=T`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, 'Accept-Language': 'pt-BR', Accept: 'application/json' },
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error('Correios (rastro): ' + (d.msgs || d.message || r.status));
