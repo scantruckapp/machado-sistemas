@@ -62,6 +62,9 @@ const carregarDados = async () => {
       entradas: r.entradas || [],
       statusEnvio: r.status_envio,
       rastreio: r.rastreio,
+      rastreioEventos: r.rastreio_eventos || [],
+      rastreioEtapa: r.rastreio_etapa || "",
+      rastreioAtualizado: r.rastreio_atualizado || "",
       frete: r.frete,
       criadoEm: r.criado_em,
       clienteRazao: r.cliente_razao,
@@ -388,6 +391,8 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
   const salvar = () => {
     if(!cliente.trim()) return alert("Informe o nome do cliente!");
     if(!tel.trim()) return alert("Informe o telefone!");
+    const digTel = tel.replace(/\D/g,"");
+    if(digTel.length<10 && !window.confirm("O telefone não tem DDD + número completo.\n\nSem ele, o cliente NÃO recebe os avisos de rastreio no WhatsApp.\n\nSalvar assim mesmo?")) return;
     onSalvar({
       id: ed.id||uid(),
       cliente: cliente.trim(), telefone: tel.trim(),
@@ -417,7 +422,7 @@ function FormPedido({usuario, pedidoInicial, onSalvar, onCancelar}) {
         <Card>
           <div style={{fontSize:12,fontWeight:700,color:S.verde,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>Cliente</div>
           <Campo label="Nome do cliente" value={cliente} onChange={setCliente} placeholder="Nome completo"/>
-          <Campo label="Telefone (últimos 4 dígitos)" value={tel} onChange={setTel} placeholder="ex: 9829"/>
+          <Campo label="WhatsApp do cliente (com DDD)" value={tel} onChange={setTel} placeholder="ex: 48 99966-8902" type="tel"/>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             <Campo label="Data do pedido" value={dataPedido} onChange={onDataPedido} type="date"/>
             <Campo label="Prev. envio (15 dias úteis)" value={dataEnvio} onChange={setDataEnvio} type="date"/>
@@ -879,6 +884,7 @@ function DetalhePedido({pedido, onVoltar, onAtualizar, onEditar, onDeletar, usua
               {pedido.rastreio&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:14}}><span style={{color:S.sub}}>Rastreio</span><span style={{color:S.txt,fontWeight:600}}>{pedido.rastreio}</span></div>}
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:14}}><span style={{color:S.sub}}>Frete cobrado</span><span style={{color:S.txt}}>{fmt(pedido.frete||0)}</span></div>
               {pedido.dataEnvio&&<div style={{display:"flex",justifyContent:"space-between",fontSize:14}}><span style={{color:S.sub}}>Prev. envio</span><span style={{color:S.txt}}>{fmtD(pedido.dataEnvio)}</span></div>}
+              {pedido.rastreio&&<RastreioTimeline pedido={pedido} onAtualizar={onAtualizar}/>}
             </>
           )}
         </Card>
@@ -1227,6 +1233,60 @@ function NfeEmissor({pedido, onAtualizar}) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── RASTREIO (linha do tempo dos Correios) ───────────────────────────────────
+const ETAPA_RASTREIO = {
+  postado:{l:"Postado",c:"#60A5FA",i:"📦"}, transito:{l:"Em trânsito",c:"#FBBF24",i:"🚚"},
+  saiu_entrega:{l:"Saiu para entrega",c:"#F59E0B",i:"🛵"}, retirada:{l:"Aguardando retirada",c:"#F472B6",i:"📬"},
+  entregue:{l:"Entregue",c:"#00C896",i:"✅"}, problema:{l:"Problema na entrega",c:"#F87171",i:"⚠️"},
+};
+function RastreioTimeline({pedido, onAtualizar}) {
+  const [eventos, setEventos] = useState(pedido.rastreioEventos||[]);
+  const [etapa, setEtapa] = useState(pedido.rastreioEtapa||"");
+  const [quando, setQuando] = useState(pedido.rastreioAtualizado||"");
+  const [carregando, setCarregando] = useState(false);
+  const [aberto, setAberto] = useState(false);
+  const atualizar = async () => {
+    setCarregando(true);
+    try {
+      const r = await fetch("/api/rastreio?id="+encodeURIComponent(pedido.id));
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.mensagem||r.status);
+      setEventos(d.rastreio_eventos||[]); setEtapa(d.rastreio_etapa||""); setQuando(new Date().toISOString());
+      if(d.status_envio && d.status_envio!==pedido.statusEnvio) onAtualizar({...pedido,statusEnvio:d.status_envio});
+    } catch(e){ alert("Não consegui consultar os Correios: "+e.message); }
+    setCarregando(false);
+  };
+  const lista = [...eventos].reverse();
+  const et = ETAPA_RASTREIO[etapa];
+  return (
+    <div style={{marginTop:14,borderTop:"1px solid "+S.borda,paddingTop:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+        <div>
+          <div style={{fontSize:12,color:S.sub,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>Rastreio Correios</div>
+          {et?<div style={{fontSize:14,fontWeight:700,color:et.c,marginTop:2}}>{et.i} {et.l}</div>
+            :<div style={{fontSize:13,color:S.dim,marginTop:2}}>Ainda não consultado</div>}
+          {quando&&<div style={{fontSize:11,color:S.dim}}>Atualizado {new Date(quando).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>}
+        </div>
+        <button onClick={atualizar} disabled={carregando} style={{background:S.card2,color:S.txt,border:"1px solid "+S.borda,borderRadius:10,padding:"8px 12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>{carregando?"⏳":"🔄 Atualizar"}</button>
+      </div>
+      {lista.length>0&&(
+        <div style={{marginTop:10}}>
+          {(aberto?lista:lista.slice(0,3)).map((e,i)=>(
+            <div key={i} style={{display:"flex",gap:10,padding:"6px 0",borderLeft:"2px solid "+(i===0?(et?et.c:S.verde):S.borda),paddingLeft:10,marginLeft:4}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,color:i===0?S.txt:S.sub,fontWeight:i===0?700:400}}>{e.descricao}</div>
+                {e.detalhe&&<div style={{fontSize:12,color:S.dim}}>{e.detalhe}</div>}
+                <div style={{fontSize:11,color:S.dim}}>{e.data?new Date(e.data).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):""}{e.cidade?` · ${e.cidade}/${e.uf}`:""}</div>
+              </div>
+            </div>
+          ))}
+          {lista.length>3&&<button onClick={()=>setAberto(!aberto)} style={{background:"none",border:"none",color:"#3B82F6",fontSize:12,cursor:"pointer",padding:"4px 0"}}>{aberto?"Ver menos":`Ver todas as ${lista.length} etapas`}</button>}
+        </div>
+      )}
     </div>
   );
 }
