@@ -41,18 +41,36 @@ const sb = async (path, opts = {}) => {
 
 // ── Correios: token (vale algumas horas; um por execução já basta) ─────────
 let tokenCorreios = null;
+let erroToken = null;
+// O número cadastrado pode ser o do CONTRATO ou o do CARTÃO DE POSTAGEM.
+// Tenta os dois jeitos (e por último só usuário + código de acesso).
 async function obterToken() {
   if (tokenCorreios) return tokenCorreios;
+  if (erroToken) throw erroToken;
   const basic = Buffer.from(`${env('CORREIOS_USUARIO')}:${env('CORREIOS_CODIGO_ACESSO')}`).toString('base64');
-  const r = await fetch(`${CORREIOS}/token/v1/autentica/contrato`, {
-    method: 'POST',
-    headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ numero: env('CORREIOS_CONTRATO') }),
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || !d.token) throw new Error('Correios (token): ' + (d.msgs || d.message || r.status));
-  tokenCorreios = d.token;
-  return tokenCorreios;
+  // Cartão Correios Fácil 0079584047 · Contrato 9912718046 · SE/SC (DR 68)
+  const cartao = String(env('CORREIOS_CARTAO') || env('CORREIOS_CONTRATO') || '0079584047').replace(/\D/g, '');
+  const contrato = String(env('CORREIOS_NUMERO_CONTRATO', '9912718046')).replace(/\D/g, '');
+  const dr = Number(env('CORREIOS_DR', '68'));
+  const tentativas = [
+    ['cartaopostagem', { numero: cartao }],
+    ['contrato', { numero: contrato, dr }],
+    ['', null],
+  ];
+  const msgs = [];
+  for (const [tipo, corpo] of tentativas) {
+    const r = await fetch(`${CORREIOS}/token/v1/autentica${tipo ? '/' + tipo : ''}`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/json' },
+      ...(corpo ? { body: JSON.stringify(corpo) } : {}),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.token) { tokenCorreios = d.token; return tokenCorreios; }
+    msgs.push(`${tipo || 'usuario'}: ${(d.msgs || [d.message || r.status]).join ? (d.msgs || [d.message || r.status]).join(' ') : d.msgs}`);
+    await new Promise((ok) => setTimeout(ok, 400)); // limite de 3 pedidos de token por segundo
+  }
+  erroToken = new Error('Correios (token): ' + msgs.join(' | '));
+  throw erroToken;
 }
 
 async function consultarCorreios(codigo) {
